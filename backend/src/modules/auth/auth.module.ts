@@ -1,19 +1,23 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
-import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from './schemas/user.schema.js';
+import {
+  TokenBlacklist,
+  TokenBlacklistSchema,
+} from './token-blacklist.schema.js';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       {
-        name: User.name,
-        schema: UserSchema,
-      }
-    ])
+        name: TokenBlacklist.name,
+        schema: TokenBlacklistSchema,
+      },
+    ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService]
+  providers: [AuthService],
+  exports: [MongooseModule],
 })
 export class AuthModule { }
