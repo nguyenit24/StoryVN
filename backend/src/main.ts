@@ -1,6 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { ConfigService } from '@nestjs/config';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,6 +13,35 @@ async function bootstrap() {
     credentials: true,
   });
   app.setGlobalPrefix('api');
+
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      exceptionFactory: (errors) => {
+        let firstMessage = 'Dữ liệu không hợp lệ';
+        for (const err of errors) {
+          if (err.constraints) {
+            firstMessage = Object.values(err.constraints)[0];
+            break;
+          }
+        }
+        return new BadRequestException(firstMessage);
+      },
+    }),
+  );
+
+  const config = new DocumentBuilder()
+    .setTitle('StoryVN API')
+    .setDescription('Tài liệu và công cụ kiểm thử API StoryVN')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(configService.get<number>('PORT') ?? 3000);
 }
