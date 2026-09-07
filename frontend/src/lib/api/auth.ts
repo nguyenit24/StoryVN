@@ -3,8 +3,10 @@ import { API_ENDPOINTS } from "./endpoints";
 import {
   ApiResponse,
   AuthLoginResponseData,
+  ForgotPasswordDto,
   LoginDto,
   RegisterDto,
+  ResetPasswordDto,
   User,
   VerifyOtpDto,
 } from "@/types/auth";
@@ -34,6 +36,22 @@ export const authApi = {
     return res.data;
   },
 
+  async forgotPassword(dto: ForgotPasswordDto): Promise<ApiResponse<null>> {
+    const res = await api.post<ApiResponse<null>>(
+      API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
+      dto
+    );
+    return res.data;
+  },
+
+  async resetPassword(dto: ResetPasswordDto): Promise<ApiResponse<null>> {
+    const res = await api.post<ApiResponse<null>>(
+      API_ENDPOINTS.AUTH.RESET_PASSWORD,
+      dto
+    );
+    return res.data;
+  },
+
   async getMe(): Promise<ApiResponse<{ user: User }>> {
     const res = await api.get<ApiResponse<{ user: User }>>(
       API_ENDPOINTS.AUTH.ME
@@ -48,3 +66,4 @@ export const authApi = {
     return res.data;
   },
 };
+

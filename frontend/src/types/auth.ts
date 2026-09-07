@@ -46,7 +46,17 @@ export interface AuthLoginResponseData {
   user: User;
 }
 
-export interface ApiResponse<T = any> {
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
+
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
   data: T;
