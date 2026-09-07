@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
-import { Role } from '../roles/role.schema.js';
+import { Role } from '../../roles/schemas/role.schema.js';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -11,12 +11,6 @@ export class SocialLinks {
 
   @Prop({ type: String, trim: true, default: '' })
   twitter?: string;
-
-  @Prop({ type: String, trim: true, default: '' })
-  github?: string;
-
-  @Prop({ type: String, trim: true, default: '' })
-  website?: string;
 }
 
 export const SocialLinksSchema = SchemaFactory.createForClass(SocialLinks);
@@ -63,9 +57,6 @@ export class User {
 
   @Prop({ type: Boolean, default: true })
   isActive: boolean;
-
-  @Prop({ type: Boolean, default: false })
-  isEmailVerified: boolean;
 
   @Prop({ type: Number, default: 0 })
   tokenVersion: number;

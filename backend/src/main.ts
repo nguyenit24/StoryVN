@@ -3,6 +3,8 @@ import { AppModule } from './app.module.js';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import express from 'express';
+import { join } from 'node:path';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 
 async function bootstrap() {
@@ -12,6 +14,10 @@ async function bootstrap() {
     origin: configService.get<string>('FRONTEND_URL') || 'http://localhost:5000',
     credentials: true,
   });
+
+  // Phục vụ file tĩnh cho thư mục uploads cục bộ
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+
   app.setGlobalPrefix('api');
 
   app.useGlobalFilters(new HttpExceptionFilter());

@@ -3,15 +3,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 
-import { AuthController } from './auth.controller.js';
-import { AuthService } from './auth.service.js';
+import { AuthController } from './controllers/auth.controller.js';
+import { AuthService } from './services/auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 
 import {
   TokenBlacklist,
   TokenBlacklistSchema,
-} from './token-blacklist.schema.js';
-import { User, UserSchema } from '../users/user.schema.js';
+} from './schemas/token-blacklist.schema.js';
+import { User, UserSchema } from '../users/schemas/user.schema.js';
 import { RolesModule } from '../roles/roles.module.js';
 
 @Module({
@@ -36,6 +36,6 @@ import { RolesModule } from '../roles/roles.module.js';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard],
-  exports: [AuthService, JwtAuthGuard, MongooseModule],
+  exports: [AuthService, JwtAuthGuard, MongooseModule, JwtModule],
 })
 export class AuthModule {}
