@@ -50,6 +50,7 @@ jobs:
       - name: Build Frontend
         run: |
           docker build \
+            --build-arg NEXT_PUBLIC_API_URL=/api \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/storyvn-frontend:latest \
             ./frontend
 
