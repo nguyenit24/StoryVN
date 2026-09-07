@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Role, RoleDocument, RoleType } from './role.schema.js';
+import { Role, RoleDocument, RoleType } from '../schemas/role.schema.js';
 
 const DEFAULT_ROLES = [
   {
@@ -29,7 +29,7 @@ export class RolesService implements OnModuleInit {
   constructor(
     @InjectModel(Role.name)
     private readonly roleModel: Model<RoleDocument>,
-  ) { }
+  ) {}
 
   async onModuleInit(): Promise<void> {
     await this.seedRoles();

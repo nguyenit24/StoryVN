@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
-import { User } from '../users/user.schema.js';
+import { User } from '../../users/schemas/user.schema.js';
 
 export type TokenBlacklistDocument = HydratedDocument<TokenBlacklist>;
 
