@@ -5,7 +5,6 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -17,18 +16,20 @@ import { Model, Types } from 'mongoose';
 import * as crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 
-import { User, UserDocument } from '../users/user.schema.js';
-import { TokenBlacklist, TokenBlacklistDocument } from './token-blacklist.schema.js';
-import { RolesService } from '../roles/roles.service.js';
-import { RoleType } from '../roles/role.schema.js';
-import { MailService } from '../../infrastructure/mail/mail.service.js';
-import { RedisService } from '../../infrastructure/redis/redis.service.js';
-import { parseDurationToMs } from '../../common/utils/time.utils.js';
+import { User, UserDocument } from '../../users/schemas/user.schema.js';
+import { TokenBlacklist, TokenBlacklistDocument } from '../schemas/token-blacklist.schema.js';
+import { RolesService } from '../../roles/services/roles.service.js';
+import { RoleType } from '../../roles/schemas/role.schema.js';
+import { MailService } from '../../../infrastructure/mail/mail.service.js';
+import { RedisService } from '../../../infrastructure/redis/redis.service.js';
+import { parseDurationToMs } from '../../../common/utils/time.utils.js';
 
-import { RegisterDto } from './dto/register.dto.js';
-import { VerifyOtpDto } from './dto/verify-otp.dto.js';
-import { LoginDto } from './dto/login.dto.js';
-import { RefreshTokenDto } from './dto/refresh-token.dto.js';
+import { RegisterDto } from '../dto/register.dto.js';
+import { VerifyOtpDto } from '../dto/verify-otp.dto.js';
+import { LoginDto } from '../dto/login.dto.js';
+import { RefreshTokenDto } from '../dto/refresh-token.dto.js';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto.js';
+import { ResetPasswordDto } from '../dto/reset-password.dto.js';
 
 interface RefreshTokenPayload {
   sub: string;
@@ -36,6 +37,23 @@ interface RefreshTokenPayload {
   tokenVersion: number;
   exp?: number;
   iat?: number;
+}
+
+interface PendingRegistrationData {
+  otp: string;
+  attempts: number;
+  userData?: {
+    username: string;
+    email: string;
+    password: string;
+    displayName: string;
+    roleId: string;
+  };
+}
+
+interface ForgotPasswordOtpData {
+  otp: string;
+  attempts: number;
 }
 
 @Injectable()
@@ -71,48 +89,31 @@ export class AuthService {
     this.otpMaxAttempts = Number(this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 5);
   }
 
-  private get redis() {
-    return this.redisService.getClient();
-  }
-
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
     const username = dto.username.toLowerCase().trim();
     const password = dto.password;
 
-    // 1. Kiểm tra email trong MongoDB
     const existingEmailUser = await this.userModel.findOne({ email }).exec();
     if (existingEmailUser) {
-      if (existingEmailUser.isEmailVerified) {
-        throw new ConflictException('Email đã tồn tại trong hệ thống');
-      }
-      // Dọn dẹp bản ghi cũ chưa xác thực (nếu có từ trước)
-      await this.userModel.deleteOne({ _id: existingEmailUser._id }).exec();
+      throw new ConflictException('Email đã tồn tại trong hệ thống');
     }
 
-    // 2. Kiểm tra username trong MongoDB
     const existingUsernameUser = await this.userModel.findOne({ username }).exec();
     if (existingUsernameUser) {
-      if (existingUsernameUser.isEmailVerified) {
-        throw new ConflictException('Tên người dùng đã tồn tại trong hệ thống');
-      }
-      await this.userModel.deleteOne({ _id: existingUsernameUser._id }).exec();
+      throw new ConflictException('Tên người dùng đã tồn tại trong hệ thống');
     }
 
-    // 3. Kiểm tra Role USER
     const userRole = await this.rolesService.findByName(RoleType.USER);
     if (!userRole) {
       throw new BadRequestException('Vai trò người dùng không tồn tại');
     }
 
-    // 4. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 5. Tạo OTP và lưu tạm dữ liệu đăng ký vào Redis (chưa tạo trong MongoDB)
-    await this.redis.del(`otp:${email}`);
+    await this.redisService.del(`otp:${email}`);
 
     const otp = crypto.randomInt(100000, 1000000).toString();
-    const pendingRegistration = {
+    const pendingRegistration: PendingRegistrationData = {
       otp,
       attempts: 0,
       userData: {
@@ -124,15 +125,14 @@ export class AuthService {
       },
     };
 
-    await this.redis.set(
+    await this.redisService.setJson(
       `otp:${email}`,
-      JSON.stringify(pendingRegistration),
-      'EX',
+      pendingRegistration,
       this.otpExpiresInSeconds,
     );
 
-    // 6. Gửi email xác thực OTP
-    await this.sendOtpEmail(email, otp);
+    const expiresInMinutes = Math.floor(this.otpExpiresInSeconds / 60);
+    await this.mailService.sendOtpEmail(email, otp, expiresInMinutes);
 
     return {
       success: true,
@@ -145,15 +145,13 @@ export class AuthService {
     const email = dto.email.toLowerCase().trim();
     const inputOtp = dto.otp.trim();
 
-    const rawOtpData = await this.redis.get(`otp:${email}`);
-    if (!rawOtpData) {
+    const otpData = await this.redisService.getJson<PendingRegistrationData>(`otp:${email}`);
+    if (!otpData) {
       throw new BadRequestException('Mã OTP không tồn tại hoặc đã hết hạn. Vui lòng đăng ký lại.');
     }
 
-    const otpData = JSON.parse(rawOtpData);
-
     if (otpData.attempts >= this.otpMaxAttempts) {
-      await this.redis.del(`otp:${email}`);
+      await this.redisService.del(`otp:${email}`);
       throw new HttpException(
         `Bạn đã nhập sai OTP quá ${this.otpMaxAttempts} lần. Vui lòng đăng ký lại để nhận mã mới.`,
         HttpStatus.TOO_MANY_REQUESTS,
@@ -162,23 +160,18 @@ export class AuthService {
 
     if (otpData.otp !== inputOtp) {
       otpData.attempts += 1;
-      const ttl = await this.redis.ttl(`otp:${email}`);
+      const ttl = await this.redisService.ttl(`otp:${email}`);
       const remainingAttempts = Math.max(0, this.otpMaxAttempts - otpData.attempts);
 
       if (remainingAttempts <= 0 || ttl <= 0) {
-        await this.redis.del(`otp:${email}`);
+        await this.redisService.del(`otp:${email}`);
         throw new HttpException(
           `Bạn đã nhập sai OTP quá ${this.otpMaxAttempts} lần. Vui lòng đăng ký lại để nhận mã mới.`,
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
 
-      await this.redis.set(
-        `otp:${email}`,
-        JSON.stringify(otpData),
-        'EX',
-        Math.max(ttl, 1),
-      );
+      await this.redisService.setJson(`otp:${email}`, otpData, Math.max(ttl, 1));
 
       const minutes = Math.floor(ttl / 60);
       const seconds = ttl % 60;
@@ -189,14 +182,13 @@ export class AuthService {
       );
     }
 
-    // OTP chính xác: Lưu User vào MongoDB từ dữ liệu tạm trong Redis
     if (otpData.userData) {
       const conflictingUser = await this.userModel.findOne({
         $or: [{ email }, { username: otpData.userData.username }],
       }).exec();
 
       if (conflictingUser) {
-        await this.redis.del(`otp:${email}`);
+        await this.redisService.del(`otp:${email}`);
         throw new ConflictException('Email hoặc tên người dùng đã tồn tại trong hệ thống');
       }
 
@@ -207,21 +199,18 @@ export class AuthService {
         displayName: otpData.userData.displayName,
         roleId: new Types.ObjectId(otpData.userData.roleId),
         isActive: true,
-        isEmailVerified: true,
         tokenVersion: 0,
       });
     } else {
-      // Tương thích ngược nếu bản ghi user đã có sẵn trong MongoDB
       const user = await this.userModel.findOne({ email }).exec();
       if (!user) {
         throw new NotFoundException('Tài khoản không tồn tại hoặc phiên xác thực đã hết hạn');
       }
-      user.isEmailVerified = true;
       user.isActive = true;
       await user.save();
     }
 
-    await this.redis.del(`otp:${email}`);
+    await this.redisService.del(`otp:${email}`);
 
     return {
       success: true,
@@ -242,10 +231,6 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
-    }
-
-    if (!user.isEmailVerified) {
-      throw new ForbiddenException('Tài khoản chưa được xác thực email. Vui lòng kiểm tra email.');
     }
 
     if (!user.isActive) {
@@ -320,7 +305,6 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token không hợp lệ');
     }
 
-    // Kiểm tra TokenBlacklist: nếu refresh token jti đã bị blacklist -> REUSE DETECTED!
     const isBlacklisted = await this.tokenBlacklistModel.findOne({ jti: payload.jti }).exec();
     if (isBlacklisted) {
       await this.userModel.updateOne(
@@ -343,7 +327,6 @@ export class AuthService {
       throw new UnauthorizedException('Phiên đăng nhập đã bị thu hồi');
     }
 
-    // Refresh Token Rotation: Blacklist token cũ vào TokenBlacklist
     const expiresAt = payload.exp
       ? new Date(payload.exp * 1000)
       : new Date(Date.now() + this.refreshTtlMs);
@@ -410,7 +393,6 @@ export class AuthService {
       ? new Date(accessExp * 1000)
       : new Date(Date.now() + this.accessExpiresInSeconds * 1000);
 
-    // Blacklist access token bằng jti và TTL
     await this.tokenBlacklistModel.updateOne(
       { jti: accessJti },
       {
@@ -424,7 +406,6 @@ export class AuthService {
       { upsert: true },
     ).exec();
 
-    // Nếu có refresh token được truyền lên, blacklist jti của refresh token đó
     if (rawRefreshToken?.trim()) {
       try {
         const refreshPayload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
@@ -451,10 +432,9 @@ export class AuthService {
           ).exec();
         }
       } catch {
-        // Refresh token đã hết hạn hoặc không hợp lệ thì bỏ qua
+        // Refresh token không hợp lệ hoặc đã hết hạn thì bỏ qua
       }
     } else {
-      // Nếu không chỉ định refresh token cụ thể, tăng tokenVersion để đăng xuất tất cả phiên
       await this.userModel.updateOne(
         { _id: userId },
         { $inc: { tokenVersion: 1 } },
@@ -468,42 +448,99 @@ export class AuthService {
     };
   }
 
-  async getProfile(userId: string) {
-    const user = await this.userModel
-      .findById(userId)
-      .select('-password')
-      .populate('roleId', 'name description isActive')
-      .lean()
-      .exec();
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.toLowerCase().trim();
 
+    const user = await this.userModel.findOne({ email }).exec();
     if (!user) {
-      throw new NotFoundException('Người dùng không tồn tại');
+      throw new NotFoundException('Không tìm thấy tài khoản với email này');
     }
+
+    if (!user.isActive) {
+      throw new ForbiddenException('Tài khoản đang bị khóa hoặc chưa được kích hoạt');
+    }
+
+    await this.redisService.del(`otp:forgot-password:${email}`);
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpData: ForgotPasswordOtpData = {
+      otp,
+      attempts: 0,
+    };
+
+    await this.redisService.setJson(
+      `otp:forgot-password:${email}`,
+      otpData,
+      this.otpExpiresInSeconds,
+    );
+
+    const expiresInMinutes = Math.floor(this.otpExpiresInSeconds / 60);
+    await this.mailService.sendForgotPasswordOtpEmail(email, otp, expiresInMinutes);
 
     return {
       success: true,
-      message: 'Lấy thông tin người dùng thành công',
-      data: {
-        user,
-      },
+      message: 'Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.',
+      data: null,
     };
   }
 
-  private async sendOtpEmail(email: string, otp: string): Promise<void> {
-    const minutes = Math.floor(this.otpExpiresInSeconds / 60);
-    this.logger.log(`[AUTH] Mã OTP cho ${email}: ${otp} (hiệu lực ${minutes} phút)`);
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.toLowerCase().trim();
+    const inputOtp = dto.otp.trim();
 
-    try {
-      await this.mailService.sendMail({
-        to: email,
-        subject: 'Mã xác thực đăng ký StoryVN',
-        text: `Mã OTP xác thực tài khoản của bạn là: ${otp}. Mã này có hiệu lực trong ${minutes} phút.`,
-      });
-    } catch (error: any) {
-      this.logger.error(`Gửi email OTP thất bại tới ${email}: ${error?.message || error}`);
-      throw new InternalServerErrorException(
-        'Không thể gửi email xác thực. Vui lòng kiểm tra lại địa chỉ email hoặc thử lại sau.',
+    const otpData = await this.redisService.getJson<ForgotPasswordOtpData>(`otp:forgot-password:${email}`);
+    if (!otpData) {
+      throw new BadRequestException('Mã OTP không tồn tại hoặc đã hết hạn. Vui lòng gửi lại yêu cầu quên mật khẩu.');
+    }
+
+    if (otpData.attempts >= this.otpMaxAttempts) {
+      await this.redisService.del(`otp:forgot-password:${email}`);
+      throw new HttpException(
+        `Bạn đã nhập sai OTP quá ${this.otpMaxAttempts} lần. Vui lòng gửi lại yêu cầu mới.`,
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+
+    if (otpData.otp !== inputOtp) {
+      otpData.attempts += 1;
+      const ttl = await this.redisService.ttl(`otp:forgot-password:${email}`);
+      const remainingAttempts = Math.max(0, this.otpMaxAttempts - otpData.attempts);
+
+      if (remainingAttempts <= 0 || ttl <= 0) {
+        await this.redisService.del(`otp:forgot-password:${email}`);
+        throw new HttpException(
+          `Bạn đã nhập sai OTP quá ${this.otpMaxAttempts} lần. Vui lòng gửi lại yêu cầu mới.`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      await this.redisService.setJson(`otp:forgot-password:${email}`, otpData, Math.max(ttl, 1));
+
+      const minutes = Math.floor(ttl / 60);
+      const seconds = ttl % 60;
+      const timeStr = minutes > 0 ? `${minutes} phút ${seconds} giây` : `${seconds} giây`;
+
+      throw new BadRequestException(
+        `Mã OTP không chính xác. Bạn còn ${remainingAttempts} lần thử (mã hết hạn sau ${timeStr}).`,
+      );
+    }
+
+    const user = await this.userModel.findOne({ email }).exec();
+    if (!user) {
+      await this.redisService.del(`otp:forgot-password:${email}`);
+      throw new NotFoundException('Tài khoản không tồn tại trong hệ thống');
+    }
+
+    user.password = await bcrypt.hash(dto.newPassword, 10);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await user.save();
+
+    await this.redisService.del(`otp:forgot-password:${email}`);
+
+    return {
+      success: true,
+      message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập với mật khẩu mới.',
+      data: null,
+    };
   }
 }

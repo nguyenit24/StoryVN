@@ -12,8 +12,8 @@ import { Model } from 'mongoose';
 import {
   TokenBlacklist,
   TokenBlacklistDocument,
-} from '../token-blacklist.schema.js';
-import { User, UserDocument } from '../../users/user.schema.js';
+} from '../schemas/token-blacklist.schema.js';
+import { User, UserDocument } from '../../users/schemas/user.schema.js';
 
 export interface JwtPayload {
   sub: string;
