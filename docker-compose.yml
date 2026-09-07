@@ -1,0 +1,50 @@
+services:
+
+  backend:
+    image: ${DOCKERHUB_USERNAME:-nguyenit3}/storyvn-backend:latest
+    container_name: storyvn-backend
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - ./backend/.env
+
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+    volumes:
+      - backend_uploads:/app/uploads
+
+    depends_on:
+      - redis
+
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME:-nguyenit3}/storyvn-frontend:latest
+    container_name: storyvn-frontend
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    env_file:
+      - ./frontend/.env
+
+    depends_on:
+      - backend
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: storyvn-redis
+    restart: unless-stopped
+
+    volumes:
+      - redis_data:/data
+
+
+volumes:
+  redis_data:
+  backend_uploads:
