@@ -1,8 +1,9 @@
 import axios from "axios";
 import { getAccessToken, clearAuth } from "../auth/token";
+import { envConfig } from "@/config/env.config";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api",
+  baseURL: envConfig.apiUrl,
   headers: {
     "Content-Type": "application/json",
   },
