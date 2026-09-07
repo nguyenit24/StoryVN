@@ -1,6 +1,9 @@
 services:
 
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     image: ${DOCKERHUB_USERNAME:-nguyenit3}/storyvn-backend:latest
     container_name: storyvn-backend
     restart: unless-stopped
@@ -22,6 +25,9 @@ services:
 
 
   frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     image: ${DOCKERHUB_USERNAME:-nguyenit3}/storyvn-frontend:latest
     container_name: storyvn-frontend
     restart: unless-stopped
@@ -41,8 +47,26 @@ services:
     container_name: storyvn-redis
     restart: unless-stopped
 
+    ports:
+      - "6379:6379"
+      
     volumes:
       - redis_data:/data
+
+
+  nginx:
+    image: nginx:alpine
+    container_name: storyvn-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"    # <-- Mở thêm cổng HTTPS
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro   # <-- Đưa chứng chỉ vào Nginx
+    depends_on:
+      - backend
+      - frontend
 
 
 volumes:
