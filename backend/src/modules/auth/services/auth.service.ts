@@ -89,6 +89,41 @@ export class AuthService {
     this.otpMaxAttempts = Number(this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 5);
   }
 
+  async generateTokens(
+    userId: string,
+    role: string,
+    tokenVersion = 0,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const accessJti = crypto.randomUUID();
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: userId,
+        jti: accessJti,
+        role,
+        tokenVersion,
+      },
+      {
+        secret: this.accessSecret,
+        expiresIn: this.accessExpiresIn as any,
+      },
+    );
+
+    const refreshJti = crypto.randomUUID();
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        sub: userId,
+        jti: refreshJti,
+        tokenVersion,
+      },
+      {
+        secret: this.refreshSecret,
+        expiresIn: this.refreshExpiresIn as any,
+      },
+    );
+
+    return { accessToken, refreshToken };
+  }
+
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
     const username = dto.username.toLowerCase().trim();
@@ -240,31 +275,10 @@ export class AuthService {
     const role = await this.rolesService.findById(user.roleId);
     const roleName = role ? role.name : RoleType.USER;
 
-    const accessJti = crypto.randomUUID();
-    const accessToken = await this.jwtService.signAsync(
-      {
-        sub: user._id.toString(),
-        jti: accessJti,
-        role: roleName,
-        tokenVersion: user.tokenVersion ?? 0,
-      },
-      {
-        secret: this.accessSecret,
-        expiresIn: this.accessExpiresIn as any,
-      },
-    );
-
-    const refreshJti = crypto.randomUUID();
-    const refreshToken = await this.jwtService.signAsync(
-      {
-        sub: user._id.toString(),
-        jti: refreshJti,
-        tokenVersion: user.tokenVersion ?? 0,
-      },
-      {
-        secret: this.refreshSecret,
-        expiresIn: this.refreshExpiresIn as any,
-      },
+    const { accessToken, refreshToken } = await this.generateTokens(
+      user._id.toString(),
+      roleName,
+      user.tokenVersion ?? 0,
     );
 
     user.lastLoginAt = new Date();
@@ -347,31 +361,10 @@ export class AuthService {
     const role = await this.rolesService.findById(user.roleId);
     const roleName = role ? role.name : RoleType.USER;
 
-    const newAccessJti = crypto.randomUUID();
-    const newAccessToken = await this.jwtService.signAsync(
-      {
-        sub: user._id.toString(),
-        jti: newAccessJti,
-        role: roleName,
-        tokenVersion: user.tokenVersion ?? 0,
-      },
-      {
-        secret: this.accessSecret,
-        expiresIn: this.accessExpiresIn as any,
-      },
-    );
-
-    const newRefreshJti = crypto.randomUUID();
-    const newRefreshToken = await this.jwtService.signAsync(
-      {
-        sub: user._id.toString(),
-        jti: newRefreshJti,
-        tokenVersion: user.tokenVersion ?? 0,
-      },
-      {
-        secret: this.refreshSecret,
-        expiresIn: this.refreshExpiresIn as any,
-      },
+    const { accessToken: newAccessToken, refreshToken: newRefreshToken } = await this.generateTokens(
+      user._id.toString(),
+      roleName,
+      user.tokenVersion ?? 0,
     );
 
     return {

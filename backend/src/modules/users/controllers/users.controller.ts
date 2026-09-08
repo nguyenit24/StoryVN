@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Query,
@@ -66,4 +67,12 @@ export class UsersController {
   async changePassword(@Req() req: any, @Body() dto: ChangePasswordDto) {
     return this.usersService.changePassword(req.user.sub, dto);
   }
+
+  @Get(':identifier')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Xem hồ sơ công khai theo ID, Username hoặc Bút danh' })
+  async findByIdentifier(@Param('identifier') identifier: string) {
+    return this.usersService.findByIdentifier(identifier);
+  }
 }
+
