@@ -3,10 +3,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { User, UpdateProfileDto } from "@/types/auth";
 import { ProfileService } from "../services/profile.service";
-import { setStoredUser } from "@/lib/auth/token";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Alert } from "@/components/ui/Alert";
+import { setStoredUser } from "@/common/utils/token";
+import { Button } from "@/common/components/Button";
+import { Input } from "@/common/components/Input";
+import { Alert } from "@/common/components/Alert";
 import { getFullImageUrl } from "@/common/utils/imageUrl";
 
 interface EditProfileModalProps {

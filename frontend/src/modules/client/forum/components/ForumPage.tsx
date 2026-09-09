@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { ClientHeader } from "@/components/layout/ClientHeader";
+import { ClientFooter } from "@/components/layout/ClientFooter";
 
 export default function ForumPostPage() {
   const [likesCount, setLikesCount] = useState(342);
@@ -74,55 +76,11 @@ export default function ForumPostPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between">
-      {/* ==================== 1. HEADER ==================== */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 sm:px-8 py-3 transition-shadow">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#1d72fe] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                S
-              </div>
-              <span className="text-xl font-black tracking-tight text-slate-900">
-                StoryVN
-              </span>
-            </Link>
+      {/* ==================== 1. SHARED UNIFIED CLIENT HEADER ==================== */}
+      <ClientHeader />
 
-            <nav className="hidden md:flex items-center gap-5 text-xs sm:text-sm font-semibold text-slate-600">
-              <Link href="/" className="hover:text-blue-600">
-                Khám phá
-              </Link>
-              <Link href="/#the-loai" className="hover:text-blue-600">
-                Thể loại
-              </Link>
-              <Link href="/#bang-xep-hang" className="hover:text-blue-600">
-                Bảng xếp hạng
-              </Link>
-              <span className="text-blue-600 font-bold">Diễn đàn</span>
-              <Link href="/me" className="hover:text-blue-600">
-                Tủ sách
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200"
-            >
-              ← Về trang chủ
-            </Link>
-            <Link
-              href="/admin"
-              className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg shadow-sm"
-            >
-              ⚙️ Admin
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* ==================== 2. FORUM POST BODY (MATCHING IMAGE 4) ==================== */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6 flex-1 w-full">
+      {/* ==================== 2. FORUM POST BODY ==================== */}
+      <main className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
         {/* Breadcrumb matching Image 4 */}
         <nav className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
           <Link href="/" className="hover:text-blue-600">
@@ -587,9 +545,7 @@ export default function ForumPostPage() {
       </main>
 
       {/* ==================== 3. FOOTER ==================== */}
-      <footer className="bg-white border-t border-slate-200/80 mt-16 py-6 text-center text-xs text-slate-500">
-        © 2024 StoryVN Corporation. Bảo lưu toàn bộ quyền tác giả và nhà phát hành.
-      </footer>
+      <ClientFooter />
     </div>
   );
 }

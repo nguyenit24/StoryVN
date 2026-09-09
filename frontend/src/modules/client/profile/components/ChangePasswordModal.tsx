@@ -2,9 +2,9 @@
 
 import React, { useState } from "react";
 import { ProfileService } from "../services/profile.service";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/common/components/Button";
+import { Input } from "@/common/components/Input";
+import { Alert } from "@/common/components/Alert";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;

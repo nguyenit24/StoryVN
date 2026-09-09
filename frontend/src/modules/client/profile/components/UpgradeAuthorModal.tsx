@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { authorApi } from "@/lib/api/author";
-import { authApi } from "@/lib/api/auth";
-import { setTokens, setStoredUser } from "@/lib/auth/token";
+import { authorApi } from "@/modules/client/profile/services/author.service";
+import { authApi } from "@/modules/client/auth/services/auth.service";
+import { setTokens, setStoredUser } from "@/common/utils/token";
 import { User } from "@/types/auth";
 import { useAuth } from "@/context/AuthContext";
 
