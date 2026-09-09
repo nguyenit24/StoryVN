@@ -26,4 +26,8 @@ export const API_ROUTES = {
   UPLOAD: {
     IMAGE: "/upload/image",
   },
+  ADMIN: {
+    DASHBOARD_OVERVIEW: "/admin/dashboard/overview",
+    DASHBOARD_EXPORT: "/admin/dashboard/export",
+  },
 } as const;

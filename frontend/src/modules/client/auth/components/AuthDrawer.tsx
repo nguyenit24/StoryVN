@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { authApi } from "@/lib/api/auth";
-import { setTokens, setStoredUser } from "@/lib/auth/token";
-import { Alert } from "@/components/ui/Alert";
+import { authApi } from "@/modules/client/auth/services/auth.service";
 import { useAuth } from "@/context/AuthContext";
+import toast from "react-hot-toast";
 
 export type AuthMode = "login" | "register" | "forgot-password";
 
@@ -28,34 +27,25 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
   const { login } = useAuth();
 
   // -------------------- LOGIN STATE --------------------
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginIdentity, setLoginIdentity] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [loginErrors, setLoginErrors] = useState<{
-    email?: string;
-    password?: string;
-  }>({});
-  const [loginGeneralError, setLoginGeneralError] = useState<string | null>(null);
-  const [loginSuccessMessage, setLoginSuccessMessage] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoginLoading, setIsLoginLoading] = useState(false);
 
   // -------------------- REGISTER STATE --------------------
   const [regStep, setRegStep] = useState<"register" | "otp">("register");
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
-  const [regDisplayName, setRegDisplayName] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
   const [regTermsAgreed, setRegTermsAgreed] = useState(true);
-
-  // OTP
-  const [otp, setOtp] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+  const [regOtp, setRegOtp] = useState("");
   const [countdown, setCountdown] = useState(300);
-
-  const [regErrors, setRegErrors] = useState<Record<string, string>>({});
-  const [regGeneralError, setRegGeneralError] = useState<string | null>(null);
-  const [regSuccessMessage, setRegSuccessMessage] = useState<string | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
   const [isRegLoading, setIsRegLoading] = useState(false);
 
   // -------------------- FORGOT PASSWORD STATE --------------------
@@ -64,10 +54,8 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
   const [forgotOtp, setForgotOtp] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
-  const [forgotCountdown, setForgotCountdown] = useState(300);
-  const [forgotErrors, setForgotErrors] = useState<Record<string, string>>({});
-  const [forgotGeneralError, setForgotGeneralError] = useState<string | null>(null);
-  const [forgotSuccessMessage, setForgotSuccessMessage] = useState<string | null>(null);
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
   const [isForgotLoading, setIsForgotLoading] = useState(false);
 
   // -------------------- EFFECTS --------------------
@@ -98,221 +86,201 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, mode, regStep, countdown]);
 
-  useEffect(() => {
-    if (!isOpen || mode !== "forgot-password" || forgotStep !== "reset" || forgotCountdown <= 0) return;
-    const timer = setInterval(() => setForgotCountdown((prev) => prev - 1), 1000);
-    return () => clearInterval(timer);
-  }, [isOpen, mode, forgotStep, forgotCountdown]);
+  if (!isOpen) return null;
 
-  const clearAllErrors = () => {
-    setLoginGeneralError(null);
-    setLoginSuccessMessage(null);
-    setLoginErrors({});
-    setRegGeneralError(null);
-    setRegSuccessMessage(null);
-    setRegErrors({});
-    setForgotGeneralError(null);
-    setForgotSuccessMessage(null);
-    setForgotErrors({});
+  const clearErrors = () => {
+    setLoginError(null);
+    setRegError(null);
+    setForgotError(null);
   };
 
   const handleSwitchMode = (newMode: AuthMode) => {
-    clearAllErrors();
+    clearErrors();
     onSwitchMode(newMode);
   };
 
   // -------------------- LOGIN HANDLER --------------------
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginGeneralError(null);
-    setLoginSuccessMessage(null);
+    setLoginError(null);
 
-    const errors: { email?: string; password?: string } = {};
-    if (!loginEmail.trim()) {
-      errors.email = "Email / Số điện thoại không được để trống";
+    if (!loginIdentity.trim() || !loginPassword.trim()) {
+      setLoginError("Vui lòng điền đầy đủ thông tin đăng nhập");
+      return;
     }
-    if (!loginPassword) {
-      errors.password = "Mật khẩu không được để trống";
-    }
-
-    setLoginErrors(errors);
-    if (Object.keys(errors).length > 0) return;
 
     setIsLoginLoading(true);
-
     try {
       const res = await authApi.login({
-        email: loginEmail.trim(),
+        email: loginIdentity.trim(),
         password: loginPassword,
       });
 
       if (res.success && res.data) {
-        // Đồng bộ token và user vào AuthContext (tự động fetch full DB profile)
-        await login(res.data.accessToken, res.data.refreshToken, res.data.user);
-
-        setLoginSuccessMessage("Đăng nhập thành công! Đang chuyển hướng...");
-
-        // Kiểm tra redirect query param hoặc vai trò ADMIN
-        const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-        const redirectParam = searchParams?.get("redirect");
-        const userRole = (res.data.user?.role || "").toUpperCase();
-
-        setTimeout(() => {
-          onClose();
-          if (onSuccess) onSuccess();
-
-          if (redirectParam) {
-            router.push(redirectParam);
-          } else if (userRole === "ADMIN" && typeof window !== "undefined" && window.location.pathname.includes("/login")) {
-            router.push("/admin");
-          } else {
-            router.refresh();
-          }
-        }, 500);
+        login(res.data.accessToken, res.data.refreshToken, res.data.user);
+        toast.success("Đăng nhập thành công! Chào mừng trở lại.");
+        onClose();
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          router.refresh();
+        }
       } else {
-        setLoginGeneralError(res.message || "Đăng nhập thất bại");
+        setLoginError(res.message || "Tài khoản hoặc mật khẩu không chính xác");
       }
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      setLoginGeneralError(
-        errorObj.response?.data?.message ||
-          "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+      setLoginError(
+        errorObj.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
       );
     } finally {
       setIsLoginLoading(false);
     }
   };
 
-  // -------------------- REGISTER HANDLER --------------------
+  // -------------------- REGISTER HANDLERS --------------------
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegGeneralError(null);
-    setRegSuccessMessage(null);
+    setRegError(null);
 
-    const errors: Record<string, string> = {};
-    if (!regUsername.trim()) errors.username = "Tên đăng nhập không được để trống";
-    if (!regEmail.trim()) errors.email = "Email không được để trống";
-    if (!regPassword) errors.password = "Mật khẩu không được để trống";
-    if (regPassword !== regConfirmPassword) errors.confirmPassword = "Mật khẩu xác nhận không khớp";
-    if (!regTermsAgreed) errors.terms = "Bạn phải đồng ý với điều khoản";
-
-    setRegErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (regUsername.trim().length < 4) {
+      setRegError("Tên đăng nhập tối thiểu 4 ký tự");
+      return;
+    }
+    if (!regEmail.includes("@")) {
+      setRegError("Địa chỉ email không hợp lệ");
+      return;
+    }
+    if (regPassword.length < 8) {
+      setRegError("Mật khẩu phải có tối thiểu 8 ký tự");
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setRegError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+    if (!regTermsAgreed) {
+      setRegError("Vui lòng đồng ý với Điều khoản dịch vụ");
+      return;
+    }
 
     setIsRegLoading(true);
-
     try {
       const res = await authApi.register({
         username: regUsername.trim(),
         email: regEmail.trim(),
-        displayName: regDisplayName.trim() || regUsername.trim(),
         password: regPassword,
       });
 
       if (res.success) {
         setRegStep("otp");
         setCountdown(300);
-        setRegSuccessMessage(res.message || "Mã OTP đã được gửi đến email của bạn.");
+        toast.success("Mã kích hoạt OTP đã được gửi tới email của bạn!");
       } else {
-        setRegGeneralError(res.message || "Đăng ký thất bại");
+        setRegError(res.message || "Đăng ký không thành công");
       }
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      setRegGeneralError(
-        errorObj.response?.data?.message || "Đăng ký không thành công. Vui lòng thử lại."
+      setRegError(
+        errorObj.response?.data?.message || "Đăng ký không thành công. Tài khoản hoặc email có thể đã tồn tại."
       );
     } finally {
       setIsRegLoading(false);
     }
   };
 
-  // -------------------- OTP VERIFY --------------------
-  const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
+  const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegGeneralError(null);
-    setRegSuccessMessage(null);
+    setRegError(null);
 
-    if (!otp.trim()) {
-      setRegErrors({ otp: "Vui lòng nhập mã OTP" });
+    if (regOtp.trim().length < 6) {
+      setRegError("Vui lòng nhập đủ 6 chữ số OTP");
       return;
     }
 
     setIsRegLoading(true);
-
     try {
       const res = await authApi.verifyOtp({
         email: regEmail.trim(),
-        otp: otp.trim(),
+        otp: regOtp.trim(),
       });
 
       if (res.success) {
-        setRegSuccessMessage("Xác thực email thành công! Đang chuyển sang đăng nhập...");
-        setTimeout(() => {
-          setLoginEmail(regEmail.trim());
-          setRegStep("register");
-          handleSwitchMode("login");
-          setLoginSuccessMessage("Tài khoản đã kích hoạt! Hãy đăng nhập.");
-        }, 1200);
+        toast.success("Xác thực tài khoản thành công! Đang đăng nhập...");
+        try {
+          const loginRes = await authApi.login({
+            email: regEmail.trim(),
+            password: regPassword,
+          });
+          if (loginRes.success && loginRes.data) {
+            login(loginRes.data.accessToken, loginRes.data.refreshToken, loginRes.data.user);
+            setTimeout(() => {
+              onClose();
+              if (onSuccess) onSuccess();
+              else router.refresh();
+            }, 200);
+            return;
+          }
+        } catch {
+          // If auto login fails, smoothly switch to login tab
+        }
+        handleSwitchMode("login");
       } else {
-        setRegGeneralError(res.message || "Xác thực OTP thất bại");
+        setRegError(res.message || "Mã OTP không hợp lệ hoặc đã hết hạn");
       }
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      setRegGeneralError(
-        errorObj.response?.data?.message || "Mã OTP không chính xác hoặc đã hết hạn."
-      );
+      setRegError(errorObj.response?.data?.message || "Mã xác thực không hợp lệ");
     } finally {
       setIsRegLoading(false);
     }
   };
 
-  // -------------------- FORGOT PASSWORD HANDLER --------------------
-  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+  // -------------------- FORGOT PASSWORD HANDLERS --------------------
+  const handleForgotEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setForgotGeneralError(null);
-    setForgotSuccessMessage(null);
+    setForgotError(null);
 
     if (!forgotEmail.trim()) {
-      setForgotErrors({ email: "Vui lòng nhập email" });
+      setForgotError("Vui lòng nhập email tài khoản của bạn");
       return;
     }
 
     setIsForgotLoading(true);
-
     try {
       const res = await authApi.forgotPassword({ email: forgotEmail.trim() });
       if (res.success) {
         setForgotStep("reset");
-        setForgotCountdown(300);
-        setForgotSuccessMessage("Mã OTP khôi phục đã được gửi về email của bạn.");
+        toast.success("Mã xác thực khôi phục mật khẩu đã được gửi!");
       } else {
-        setForgotGeneralError(res.message || "Không thể gửi OTP");
+        setForgotError(res.message || "Không thể gửi mã khôi phục mật khẩu");
       }
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      setForgotGeneralError(
-        errorObj.response?.data?.message || "Không thể gửi yêu cầu quên mật khẩu."
-      );
+      setForgotError(errorObj.response?.data?.message || "Không tìm thấy tài khoản với email này.");
     } finally {
       setIsForgotLoading(false);
     }
   };
 
-  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+  const handleForgotResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setForgotGeneralError(null);
-    setForgotSuccessMessage(null);
+    setForgotError(null);
 
-    const errors: Record<string, string> = {};
-    if (!forgotOtp.trim()) errors.otp = "Vui lòng nhập mã OTP";
-    if (!forgotNewPassword) errors.newPassword = "Vui lòng nhập mật khẩu mới";
-    if (forgotNewPassword !== forgotConfirmPassword) errors.confirmPassword = "Mật khẩu xác nhận không khớp";
-
-    setForgotErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (!forgotOtp.trim()) {
+      setForgotError("Vui lòng nhập mã xác thực OTP");
+      return;
+    }
+    if (forgotNewPassword.length < 8) {
+      setForgotError("Mật khẩu mới tối thiểu 8 ký tự");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError("Mật khẩu xác nhận không khớp");
+      return;
+    }
 
     setIsForgotLoading(true);
-
     try {
       const res = await authApi.resetPassword({
         email: forgotEmail.trim(),
@@ -321,651 +289,656 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
       });
 
       if (res.success) {
-        setForgotSuccessMessage("Đặt lại mật khẩu thành công! Chuyển về trang đăng nhập...");
-        setTimeout(() => {
-          setLoginEmail(forgotEmail.trim());
-          setForgotStep("email");
-          handleSwitchMode("login");
-          setLoginSuccessMessage("Mật khẩu đã đổi thành công. Vui lòng đăng nhập.");
-        }, 1200);
+        toast.success("Đổi mật khẩu thành công! Vui lòng đăng nhập.");
+        handleSwitchMode("login");
       } else {
-        setForgotGeneralError(res.message || "Đặt lại mật khẩu thất bại");
+        setForgotError(res.message || "Đổi mật khẩu thất bại");
       }
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
-      setForgotGeneralError(
-        errorObj.response?.data?.message || "Đặt lại mật khẩu thất bại."
-      );
+      setForgotError(errorObj.response?.data?.message || "Khôi phục mật khẩu thất bại.");
     } finally {
       setIsForgotLoading(false);
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  const handleSocialClick = (provider: string) => {
+    toast(`Đang kết nối cổng đăng nhập ${provider}...`, { icon: "🔗" });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <>
-      {/* 1. Backdrop Overlay */}
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 select-none animate-fadeIn">
+      {/* Background Click to dismiss */}
+      <div className="absolute inset-0" onClick={onClose} />
+
+      {/* Main Dialog Wrapper (Spacious, tall, elegant) */}
       <div
-        className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 transition-opacity duration-300 animate-fadeIn"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-4xl xl:max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col md:flex-row min-h-[580px] md:min-h-[660px] max-h-[92vh]"
+      >
+        {/* ==================== LEFT COLUMN: ARTISTIC SHOWCASE ==================== */}
+        <div className="hidden md:flex md:w-5/12 lg:w-1/2 relative bg-slate-950 overflow-hidden flex-col justify-between p-8 lg:p-10 text-white shrink-0">
+          {/* Background Image with Soft Vignette */}
+          <img
+            alt="StoryVN Không Gian Văn Học Số"
+            className="absolute inset-0 w-full h-full object-cover object-center scale-105 transition-transform duration-700 hover:scale-100"
+            src={
+              mode === "register"
+                ? "https://lh3.googleusercontent.com/aida-public/AB6AXuC448_PDwq37D1runHB47hnmR02N8d6Xm0gN5pj-fE-ODFFXwbMQwAdH1SqTLiX23nPF2O9BGTZ2T1C50RZ4RObro4DfrwMGArd0M4OPoI1VnnklZmomNcx64HK6eJLRFwfikKgy6oI_EjBe-kNHMEOhUYnFtzUq3rZFpxJ7D8Qv_KpvJWfk-VfpA8mQuZHdD1L1_xCbWaWbU9EHMvIfX5RsfsZQsX-DRHZHYcrHecaw4GJW32MptOqUA"
+                : "https://lh3.googleusercontent.com/aida-public/AB6AXuDCTqBteeVbXG7NQKSeJeFGG0v_cy7L9DMzuD02zpWf09Gy7Z8W2CLcwU8oykB4tAZMHEqufNvOIALTYBX6QaikjuQZH3MxZFsRMEB-YfE1HbFX1kARbIWn2Cc8mwSXFtUE7M08mpLMLseHyzN9RLZirWCogCEI-JHXiqL4LdIC2w32CNo8FlJX_bX2gFmvSr6HGYHRJ7J1tKjuIb_Rre5FQNq16mgKwtOM_CaRylxVfwSMCCO90Shjng"
+            }
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/65 to-slate-950/40" />
 
-      {/* 2. Split Screen Modal (Exact Match to Image 1) */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-        <div
-          className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200/50 grid grid-cols-1 lg:grid-cols-12 overflow-hidden my-auto animate-fadeIn"
-          role="dialog"
-          aria-modal="true"
-        >
-          {/* ==================== LEFT COLUMN: DARK NAVY BRAND HERO ==================== */}
-          <div className="hidden lg:flex lg:col-span-5 bg-[#131927] text-white p-8 sm:p-10 flex-col justify-between relative overflow-hidden">
-            {/* Background subtle glow effect */}
-            <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            {/* Top Brand Bar */}
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#1d72fe] flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-black tracking-tight text-white leading-none">
-                    StoryVN
-                  </h3>
-                  <span className="text-[10px] tracking-wider text-slate-400 font-semibold uppercase">
-                    NỀN TẢNG VĂN HỌC SỐ
-                  </span>
-                </div>
+          {/* Top Brand Header (Clean, no Tac quyen badge) */}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/30">
+                S
               </div>
-
-              {/* Tag Pill */}
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[11px] text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Hệ sinh thái tác quyền 4.0</span>
-              </div>
-            </div>
-
-            {/* Middle: Angled Phone Mockup & Quotes */}
-            <div className="relative z-10 my-8 space-y-6">
-              {/* Miniature App Preview Card */}
-              <div className="w-full max-w-[240px] mx-auto bg-white text-slate-800 rounded-2xl p-3.5 shadow-2xl border border-slate-200/20 transform -rotate-1 hover:rotate-0 transition-transform duration-300 text-[11px]">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 font-bold text-slate-700">
-                  <span>Tài khoản</span>
-                  <span className="text-slate-400 font-normal">✕</span>
-                </div>
-                <div className="space-y-1.5 pt-1.5">
-                  <div className="text-[10px] font-semibold text-slate-600">Đăng nhập</div>
-                  <div className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[9px] text-slate-500 truncate">
-                    nguyenhuynh.463459@gmail.com
-                  </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[9px] text-slate-500">
-                    ••••••••••••
-                  </div>
-                  <div className="flex items-center justify-between text-[8px] text-slate-500">
-                    <span className="text-blue-600 font-medium">✓ Nhớ mật khẩu</span>
-                    <span className="text-blue-500">Quên mật khẩu?</span>
-                  </div>
-                  <div className="w-full bg-[#1d72fe] text-white font-bold text-center py-1 rounded text-[9px]">
-                    Đăng nhập
-                  </div>
-                  <div className="text-[8px] text-center text-slate-400 py-0.5">Hoặc đăng nhập qua</div>
-                  <div className="grid grid-cols-2 gap-1 text-[8px] font-medium text-center">
-                    <div className="bg-blue-600 text-white rounded py-0.5">Zalo</div>
-                    <div className="bg-blue-700 text-white rounded py-0.5">Facebook</div>
-                  </div>
-                </div>
-
-                {/* Floating Book Tag Over Mockup */}
-                <div className="mt-2 pt-1 border-t border-slate-100 text-center">
-                  <span className="inline-block px-2 py-0.5 bg-blue-600 text-white text-[8px] font-bold rounded-full">
-                    Tác phẩm tiêu biểu
-                  </span>
-                  <div className="font-black text-slate-900 text-[11px] mt-1">
-                    Huyền Thoại Trấn Giang
-                  </div>
-                </div>
-              </div>
-
-              {/* Gold Quote */}
-              <div className="text-center space-y-2 px-2">
-                <div className="text-amber-400 font-serif font-black text-3xl leading-none">
-                  “
-                </div>
-                <p className="text-xs sm:text-sm italic text-slate-200 leading-relaxed font-normal">
-                  &ldquo;Nơi hội tụ những ngòi bút tinh hoa và thế giới tưởng tượng bất tận của văn học kỳ ảo Việt Nam.&rdquo;
-                </p>
-                <div className="text-[11px] font-semibold text-slate-400">
-                  — Hội Nhà Văn Trẻ StoryVN —
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom: Stats & Publishing Partners */}
-            <div className="relative z-10 space-y-5">
-              {/* Stats Box */}
-              <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-3.5 grid grid-cols-2 gap-3 text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-400/20 flex items-center justify-center text-blue-400 shrink-0">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-base font-black text-white">50.000+</div>
-                    <div className="text-[10px] text-slate-400 leading-tight">Bộ tác phẩm độc quyền</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/30 border border-amber-400/20 flex items-center justify-center text-amber-300 shrink-0">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-base font-black text-white">120.000+</div>
-                    <div className="text-[10px] text-slate-400 leading-tight">Độc giả hàng ngày</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Publisher Partners Row */}
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] tracking-wider font-semibold text-slate-400">
-                <span className="uppercase text-slate-500 font-bold">ĐỐI TÁC XUẤT BẢN</span>
-                <span className="hover:text-white transition-colors">NXB KIM ĐỒNG</span>
-                <span className="hover:text-white transition-colors">NHÃ NAM</span>
-                <span className="hover:text-white transition-colors">TRE</span>
-                <span className="hover:text-white transition-colors">PUB</span>
+              <div>
+                <span className="text-xl font-bold tracking-tight text-white">StoryVN</span>
+                <p className="text-xs text-slate-300 font-normal">Nền tảng văn học số độc quyền</p>
               </div>
             </div>
           </div>
 
-          {/* ==================== RIGHT COLUMN: CRISP AUTH FORMS ==================== */}
-          <div className="lg:col-span-7 bg-white p-6 sm:p-10 flex flex-col justify-between max-h-[92vh] overflow-y-auto">
-            {/* Top Close Button & Mode Switch Tabs */}
-            <div>
-              <div className="flex items-center justify-between gap-4 mb-6">
-                {/* Tabs matching Image 1: [Đăng nhập] [Đăng ký thành viên] */}
-                <div className="bg-slate-100/90 p-1 rounded-xl flex items-center gap-1 text-xs sm:text-sm font-semibold">
+          {/* Middle Quote */}
+          <div className="relative z-10 my-auto py-6 space-y-3 max-w-sm">
+            <div className="inline-flex items-center gap-1.5 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">stars</span>
+              <span>Hội đồng tuyển chọn StoryVN</span>
+            </div>
+            <p className="text-slate-100 text-base leading-relaxed italic font-light">
+              &ldquo;Nơi mỗi trang viết mở ra một hành trình cảm xúc, và từng câu chữ đều mang hơi thở của văn học Việt đương đại.&rdquo;
+            </p>
+          </div>
+
+          {/* Bottom Literary Stats */}
+          <div className="relative z-10 pt-4 border-t border-white/15 flex items-center justify-between text-xs text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-blue-400 text-[18px]">menu_book</span>
+              <span className="text-xs">50.000+ tác phẩm</span>
+            </div>
+            <div className="flex items-center gap-2 text-emerald-400 font-medium">
+              <span className="material-symbols-outlined text-[18px]">group</span>
+              <span className="text-xs">120.000+ độc giả</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ==================== RIGHT COLUMN: SPACIOUS FORM ==================== */}
+        <div className="w-full md:w-7/12 lg:w-1/2 bg-white p-6 sm:p-8 md:p-10 flex flex-col justify-between relative overflow-y-auto">
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-20 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+            aria-label="Đóng cửa sổ"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+
+          {/* -------------------- MODE: LOGIN -------------------- */}
+          {mode === "login" && (
+            <div className="w-full my-auto py-2">
+              <header className="mb-6">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Đăng nhập</h2>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1.5">
+                  Chào mừng bạn trở lại với không gian văn học số StoryVN
+                </p>
+              </header>
+
+              {loginError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {/* Identity Input with Account Icon */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Email hoặc Tên đăng nhập
+                  </label>
+                  <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                      account_circle
+                    </span>
+                    <input
+                      type="text"
+                      value={loginIdentity}
+                      onChange={(e) => setLoginIdentity(e.target.value)}
+                      placeholder="vd: docgia@storyvn.vn hoặc username"
+                      required
+                      className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input with Lock Icon and Eye Toggle */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Mật khẩu
+                  </label>
+                  <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                      lock
+                    </span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu của bạn"
+                      required
+                      className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer ml-1 p-0.5"
+                      aria-label="Hiện hoặc ẩn mật khẩu"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        {showPassword ? "visibility_off" : "visibility"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me & Forgot Password */}
+                <div className="flex items-center justify-between pt-0.5 text-xs sm:text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-slate-600 text-xs sm:text-sm">Ghi nhớ đăng nhập</span>
+                  </label>
                   <button
                     type="button"
-                    onClick={() => handleSwitchMode("login")}
-                    className={`px-4 sm:px-6 py-2 rounded-lg transition-all cursor-pointer ${
-                      mode === "login"
-                        ? "bg-white text-blue-600 shadow-sm font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    onClick={() => handleSwitchMode("forgot-password")}
+                    className="text-blue-600 hover:text-blue-700 font-semibold hover:underline text-xs sm:text-sm cursor-pointer"
                   >
-                    Đăng nhập
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSwitchMode("register")}
-                    className={`px-4 sm:px-6 py-2 rounded-lg transition-all cursor-pointer ${
-                      mode === "register"
-                        ? "bg-white text-blue-600 shadow-sm font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Đăng ký thành viên
+                    Quên mật khẩu?
                   </button>
                 </div>
 
+                {/* Submit Button */}
                 <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer text-lg shrink-0"
-                  title="Đóng (Esc)"
+                  type="submit"
+                  disabled={isLoginLoading}
+                  className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-md shadow-blue-600/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
-                  ✕
+                  {isLoginLoading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Đăng nhập</span>
+                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </>
+                  )}
                 </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative flex items-center my-5">
+                <div className="grow border-t border-slate-200"></div>
+                <span className="shrink-0 mx-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">
+                  Hoặc
+                </span>
+                <div className="grow border-t border-slate-200"></div>
               </div>
 
-              {/* ==================== FORM 1: LOGIN MODE ==================== */}
-              {mode === "login" && (
-                <div className="space-y-5 animate-fadeIn">
-                  <div className="space-y-1">
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                      Chào mừng trở lại StoryVN
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-500">
-                      Tiếp tục hành trình phiêu lưu cùng hàng ngàn tác phẩm hấp dẫn.
+              {/* ONLY Google Social Button */}
+              <button
+                type="button"
+                onClick={() => handleSocialClick("Google")}
+                className="w-full flex items-center justify-center gap-3 py-2.5 sm:py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                </svg>
+                <span>Đăng nhập với Google</span>
+              </button>
+
+              {/* Switch to Register */}
+              <div className="mt-5 text-center">
+                <p className="text-xs sm:text-sm text-slate-600">
+                  Chưa có tài khoản?{" "}
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchMode("register")}
+                    className="font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer ml-1"
+                  >
+                    Đăng ký ngay
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* -------------------- MODE: REGISTER -------------------- */}
+          {mode === "register" && (
+            <div className="w-full my-auto py-2">
+              {regStep === "register" ? (
+                <>
+                  <header className="mb-5">
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold mb-1.5">
+                      Thành viên mới
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Tạo tài khoản</h2>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Gia nhập cộng đồng người đọc và tác giả StoryVN
                     </p>
-                  </div>
+                  </header>
 
-                  {loginGeneralError && (
-                    <Alert
-                      type="error"
-                      message={loginGeneralError}
-                      onClose={() => setLoginGeneralError(null)}
-                    />
-                  )}
-                  {loginSuccessMessage && (
-                    <Alert type="success" message={loginSuccessMessage} />
+                  {regError && (
+                    <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                      <span>{regError}</span>
+                    </div>
                   )}
 
-                  <form onSubmit={handleLoginSubmit} className="space-y-4">
-                    {/* Email / ID Input */}
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-700">
-                        Email / Số điện thoại / StoryID
+                  <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                    {/* Username Input with Icon */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Tên tài khoản / Biệt danh <span className="text-rose-500">*</span>
                       </label>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-3.5 text-slate-400 pointer-events-none text-base">
-                          @
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                        <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                          person
                         </span>
                         <input
                           type="text"
-                          placeholder="vd: tieuthuyetgia@storyvn.vn"
-                          value={loginEmail}
-                          onChange={(e) => {
-                            setLoginEmail(e.target.value);
-                            if (loginErrors.email) setLoginErrors({ ...loginErrors, email: undefined });
-                          }}
-                          className={`w-full bg-slate-50 border text-slate-900 text-sm rounded-xl pl-9 pr-4 py-3 outline-none transition-all placeholder:text-slate-400 focus:bg-white ${
-                            loginErrors.email
-                              ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                              : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          }`}
+                          value={regUsername}
+                          onChange={(e) => setRegUsername(e.target.value)}
+                          placeholder="vd: thanhphong (tối thiểu 4 ký tự)"
+                          required
+                          className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
                         />
                       </div>
-                      {loginErrors.email && (
-                        <p className="text-xs text-red-500 font-medium">{loginErrors.email}</p>
-                      )}
                     </div>
 
-                    {/* Password Input */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-xs font-bold text-slate-700">
-                          Mật khẩu
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => handleSwitchMode("forgot-password")}
-                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
-                        >
-                          Quên mật khẩu?
-                        </button>
-                      </div>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-3.5 text-slate-400 pointer-events-none">
-                          🔒
+                    {/* Email Input with Icon */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Địa chỉ Email <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                        <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                          mail
                         </span>
                         <input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Tối thiểu 8 ký tự bảo mật"
-                          value={loginPassword}
-                          onChange={(e) => {
-                            setLoginPassword(e.target.value);
-                            if (loginErrors.password) setLoginErrors({ ...loginErrors, password: undefined });
-                          }}
-                          className={`w-full bg-slate-50 border text-slate-900 text-sm rounded-xl pl-9 pr-10 py-3 outline-none transition-all placeholder:text-slate-400 focus:bg-white ${
-                            loginErrors.password
-                              ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                              : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          }`}
+                          type="email"
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          placeholder="vd: bandoc@example.com"
+                          required
+                          className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password with Icon & Toggle */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Mật khẩu <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                        <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                          lock
+                        </span>
+                        <input
+                          type={showRegPassword ? "text" : "password"}
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          placeholder="Tối thiểu 8 ký tự"
+                          required
+                          className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
                         />
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 text-slate-400 hover:text-slate-600 text-sm cursor-pointer"
+                          onClick={() => setShowRegPassword(!showRegPassword)}
+                          className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer ml-1 p-0.5"
+                          aria-label="Hiện hoặc ẩn mật khẩu"
                         >
-                          {showPassword ? "🙈" : "👁️"}
+                          <span className="material-symbols-outlined text-[20px]">
+                            {showRegPassword ? "visibility_off" : "visibility"}
+                          </span>
                         </button>
                       </div>
-                      {loginErrors.password && (
-                        <p className="text-xs text-red-500 font-medium">{loginErrors.password}</p>
-                      )}
                     </div>
 
-                    {/* Remember me & SSL */}
-                    <div className="flex items-center justify-between pt-1">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-600 select-none">
-                        <input
-                          type="checkbox"
-                          checked={rememberMe}
-                          onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
-                        />
-                        <span>Ghi nhớ đăng nhập trên máy này</span>
+                    {/* Confirm Password with Lock Reset Icon */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Xác nhận mật khẩu <span className="text-rose-500">*</span>
                       </label>
-                      <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
-                        🛡️ 256-bit SSL
-                      </span>
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                        <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                          lock_reset
+                        </span>
+                        <input
+                          type={showRegConfirmPassword ? "text" : "password"}
+                          value={regConfirmPassword}
+                          onChange={(e) => setRegConfirmPassword(e.target.value)}
+                          placeholder="Nhập lại mật khẩu"
+                          required
+                          className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                          className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer ml-1 p-0.5"
+                          aria-label="Hiện hoặc ẩn mật khẩu xác nhận"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">
+                            {showRegConfirmPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Terms Agreement */}
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+                      <input
+                        type="checkbox"
+                        checked={regTermsAgreed}
+                        onChange={(e) => setRegTermsAgreed(e.target.checked)}
+                        className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                      />
+                      <span className="text-xs text-slate-600 leading-tight">
+                        Tôi đồng ý với{" "}
+                        <span className="text-blue-600 font-medium hover:underline">Điều khoản dịch vụ</span>{" "}
+                        và{" "}
+                        <span className="text-blue-600 font-medium hover:underline">Quy chuẩn cộng đồng</span>.
+                      </span>
+                    </label>
 
                     {/* Submit Button */}
                     <button
                       type="submit"
-                      disabled={isLoginLoading}
-                      className="w-full bg-[#1d72fe] hover:bg-blue-600 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                      disabled={isRegLoading}
+                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     >
-                      {isLoginLoading ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Đang đăng nhập...</span>
-                        </>
+                      {isRegLoading ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <>
-                          <span>Đăng nhập vào StoryVN</span>
-                          <span className="text-lg">→</span>
+                          <span>Đăng ký tài khoản</span>
+                          <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                         </>
                       )}
                     </button>
                   </form>
 
-                  {/* Social Divider */}
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-200"></div>
-                    <span className="flex-shrink mx-4 text-xs text-slate-400 font-medium">
-                      Hoặc đăng nhập nhanh qua
-                    </span>
-                    <div className="flex-grow border-t border-slate-200"></div>
-                  </div>
-
-                  {/* 4 Social Buttons matching Image 1 */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setLoginGeneralError("Đăng nhập Zalo ID đang được hoàn thiện. Vui lòng đăng nhập bằng Email và Mật khẩu.")}
-                      className="flex items-center justify-center gap-2 bg-[#0068ff] hover:bg-blue-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm cursor-pointer"
-                    >
-                      <span className="w-5 h-5 rounded-full bg-white text-[#0068ff] flex items-center justify-center font-black text-[10px]">
-                        Z
+                  {/* Divider */}
+                  <div className="relative text-center my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">
+                        Hoặc
                       </span>
-                      <span>Zalo ID</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setLoginGeneralError("Đăng nhập Google đang được hoàn thiện. Vui lòng đăng nhập bằng Email và Mật khẩu.")}
-                      className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold py-2.5 px-4 rounded-xl border border-slate-200 transition-all shadow-xs cursor-pointer"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z" />
-                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z" />
-                        <path fill="#FBBC05" d="M5.28 14.27a7.18 7.18 0 0 1 0-4.54V6.58H1.25a11.98 11.98 0 0 0 0 10.84l4.03-3.15Z" />
-                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z" />
-                      </svg>
-                      <span>Google</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setLoginGeneralError("Đăng nhập Apple ID đang được hoàn thiện. Vui lòng đăng nhập bằng Email và Mật khẩu.")}
-                      className="flex items-center justify-center gap-2 bg-black hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 fill-current" viewBox="0 0 170 170">
-                        <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.04-7.67-7.81-11.96-14.34-5.77-8.91-10.37-19.16-13.79-30.74-3.43-11.59-5.14-22.75-5.14-33.51 0-14.75 3.69-26.68 11.06-35.8 7.37-9.12 16.59-13.79 27.67-14.02 5.03 0 10.5 1.25 16.42 3.75 5.92 2.5 9.77 3.86 11.54 4.09 2.57-.45 6.72-1.93 12.44-4.44 5.73-2.51 10.86-3.69 15.4-3.53 11.83.67 21.43 4.88 28.81 12.63-10.28 6.25-15.31 14.86-15.09 25.82.22 8.48 3.52 15.7 9.89 21.64 6.37 5.95 14.08 9.38 23.13 10.3-2.24 6.7-5.03 13.5-8.38 20.39zM119.22 33.11c0-7.37 2.68-14.34 8.04-20.91 5.36-6.58 11.84-10.97 19.43-13.2 1.12 7.82-.78 15.08-5.7 21.78-4.92 6.7-11.84 10.97-20.76 12.81-.33-.16-.67-.32-1.01-.48z" />
-                      </svg>
-                      <span>Apple ID</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setLoginGeneralError("Đăng nhập Facebook đang được hoàn thiện. Vui lòng đăng nhập bằng Email và Mật khẩu.")}
-                      className="flex items-center justify-center gap-2 bg-[#1877f2] hover:bg-blue-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm cursor-pointer"
-                    >
-                      <span className="font-serif font-black text-sm">f</span>
-                      <span>Facebook</span>
-                    </button>
+                    </div>
                   </div>
 
-                  {/* StoryStudio Banner Matching Image 1 */}
-                  <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-800 flex items-center justify-center text-sm font-bold">
-                        ✍️
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">Bạn muốn sáng tác?</div>
-                        <div className="text-[11px] text-slate-500">Nhận nhuận bút &amp; phát triển độc giả</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        router.push("/me");
-                      }}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
-                    >
-                      <span>StoryStudio</span>
-                      <span>›</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+                  {/* ONLY Google Social Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSocialClick("Google")}
+                    className="w-full flex items-center justify-center gap-3 py-2.5 sm:py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
+                  >
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                    </svg>
+                    <span>Đăng ký với Google</span>
+                  </button>
 
-              {/* ==================== FORM 2: REGISTER MODE ==================== */}
-              {mode === "register" && (
-                <div className="space-y-4 animate-fadeIn">
-                  {regStep === "register" ? (
-                    <>
-                      <div className="space-y-1">
-                        <h2 className="text-2xl font-black text-slate-900">
-                          Tạo tài khoản StoryVN
-                        </h2>
-                        <p className="text-xs text-slate-500">
-                          Tham gia cộng đồng hàng trăm ngàn độc giả và tác giả tinh hoa.
-                        </p>
-                      </div>
-
-                      {regGeneralError && <Alert type="error" message={regGeneralError} />}
-
-                      <form onSubmit={handleRegisterSubmit} className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            Tên đăng nhập *
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="vd: kimdung2024"
-                            value={regUsername}
-                            onChange={(e) => setRegUsername(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                          />
-                          {regErrors.username && (
-                            <p className="text-[11px] text-red-500 mt-1">{regErrors.username}</p>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            Địa chỉ Email *
-                          </label>
-                          <input
-                            type="email"
-                            placeholder="vd: author@example.com"
-                            value={regEmail}
-                            onChange={(e) => setRegEmail(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                          />
-                          {regErrors.email && (
-                            <p className="text-[11px] text-red-500 mt-1">{regErrors.email}</p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Mật khẩu *
-                            </label>
-                            <input
-                              type="password"
-                              placeholder="Tối thiểu 6 ký tự"
-                              value={regPassword}
-                              onChange={(e) => setRegPassword(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                            />
-                            {regErrors.password && (
-                              <p className="text-[11px] text-red-500 mt-1">{regErrors.password}</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Xác nhận mật khẩu *
-                            </label>
-                            <input
-                              type="password"
-                              placeholder="Nhập lại mật khẩu"
-                              value={regConfirmPassword}
-                              onChange={(e) => setRegConfirmPassword(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                            />
-                            {regErrors.confirmPassword && (
-                              <p className="text-[11px] text-red-500 mt-1">{regErrors.confirmPassword}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={isRegLoading}
-                          className="w-full bg-[#1d72fe] hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md text-xs cursor-pointer transition-all"
-                        >
-                          {isRegLoading ? "Đang xử lý..." : "Tiếp tục đăng ký →"}
-                        </button>
-                      </form>
-                    </>
-                  ) : (
-                    /* OTP Verification */
-                    <div className="space-y-4">
-                      <h3 className="text-xl font-bold text-slate-900">Xác thực mã OTP</h3>
-                      <p className="text-xs text-slate-500">
-                        Nhập mã xác thực 6 chữ số vừa gửi đến email <b>{regEmail}</b> ({formatTime(countdown)})
-                      </p>
-                      {regGeneralError && <Alert type="error" message={regGeneralError} />}
-                      <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          placeholder="Mã OTP 6 số"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
-                          className="w-full text-center tracking-widest text-xl font-mono py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-500 outline-none"
-                        />
-                        <button
-                          type="submit"
-                          disabled={isRegLoading}
-                          className="w-full bg-[#1d72fe] text-white font-bold py-3 rounded-xl text-xs cursor-pointer"
-                        >
-                          {isRegLoading ? "Đang xác thực..." : "Kích hoạt tài khoản"}
-                        </button>
-                      </form>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ==================== FORM 3: FORGOT PASSWORD ==================== */}
-              {mode === "forgot-password" && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchMode("login")}
-                      className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 mb-2 cursor-pointer"
-                    >
-                      ← Quay lại đăng nhập
-                    </button>
-                    <h2 className="text-2xl font-black text-slate-900">
-                      Khôi phục mật khẩu
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Nhận mã OTP bảo mật để thiết lập lại mật khẩu tài khoản của bạn.
+                  {/* Switch to Login */}
+                  <div className="pt-4 text-center">
+                    <p className="text-xs sm:text-sm text-slate-600">
+                      Đã có tài khoản?{" "}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchMode("login")}
+                        className="text-blue-600 hover:text-blue-700 font-semibold hover:underline cursor-pointer ml-1"
+                      >
+                        Đăng nhập ngay
+                      </button>
                     </p>
                   </div>
+                </>
+              ) : (
+                /* OTP Verification Substep with icon */
+                <form onSubmit={handleOtpVerify} className="space-y-4 py-2">
+                  <header>
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                      <span className="material-symbols-outlined text-[28px]">mark_email_read</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900">Xác thực mã OTP</h2>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Mã xác thực gồm 6 chữ số đã gửi tới <b>{regEmail}</b>
+                    </p>
+                  </header>
 
-                  {forgotGeneralError && <Alert type="error" message={forgotGeneralError} />}
-                  {forgotSuccessMessage && <Alert type="success" message={forgotSuccessMessage} />}
+                  {regError && (
+                    <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                      <span>{regError}</span>
+                    </div>
+                  )}
 
-                  {forgotStep === "email" ? (
-                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Email đã đăng ký tài khoản
-                        </label>
-                        <input
-                          type="email"
-                          placeholder="vd: tieuthuyetgia@storyvn.vn"
-                          value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={isForgotLoading}
-                        className="w-full bg-[#1d72fe] text-white font-bold py-3 rounded-xl text-xs cursor-pointer"
-                      >
-                        {isForgotLoading ? "Đang gửi..." : "Gửi mã xác thực OTP →"}
-                      </button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Mã xác thực OTP
+                    </label>
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-4 py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <span className="material-symbols-outlined text-[20px] text-slate-400 mr-3 shrink-0">
+                        pin
+                      </span>
                       <input
                         type="text"
                         maxLength={6}
-                        placeholder="Nhập mã OTP 6 số"
-                        value={forgotOtp}
-                        onChange={(e) => setForgotOtp(e.target.value)}
-                        className="w-full text-center tracking-widest text-lg font-mono py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-500 outline-none"
+                        value={regOtp}
+                        onChange={(e) => setRegOtp(e.target.value)}
+                        placeholder="Nhập 6 số OTP"
+                        required
+                        className="w-full text-center text-xl tracking-widest font-mono font-bold text-slate-800 bg-transparent border-none p-0 outline-none"
                       />
-                      <input
-                        type="password"
-                        placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
-                        value={forgotNewPassword}
-                        onChange={(e) => setForgotNewPassword(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                      />
-                      <input
-                        type="password"
-                        placeholder="Xác nhận lại mật khẩu mới"
-                        value={forgotConfirmPassword}
-                        onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:bg-white focus:border-blue-500"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isForgotLoading}
-                        className="w-full bg-[#1d72fe] text-white font-bold py-3 rounded-xl text-xs cursor-pointer"
-                      >
-                        {isForgotLoading ? "Đang xử lý..." : "Hoàn tất đổi mật khẩu"}
-                      </button>
-                    </form>
-                  )}
-                </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 text-center">
+                    Thời gian còn lại:{" "}
+                    <span className="font-mono text-blue-600 font-bold">
+                      {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}
+                    </span>
+                  </p>
+
+                  <button
+                    type="submit"
+                    disabled={isRegLoading}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
+                  >
+                    {isRegLoading ? "Đang xác thực..." : "Kích hoạt tài khoản"}
+                  </button>
+
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setRegStep("register")}
+                      className="text-xs sm:text-sm text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                    >
+                      Quay lại chỉnh sửa thông tin
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
+          )}
 
-            {/* Bottom Disclaimer matching Image 1 */}
-            <div className="pt-6 mt-6 border-t border-slate-100 text-center text-[11px] text-slate-400">
-              Bằng việc tiếp tục, bạn đồng ý với{" "}
-              <a href="#" className="text-blue-600 hover:underline">
-                Điều khoản dịch vụ
-              </a>{" "}
-              và{" "}
-              <a href="#" className="text-blue-600 hover:underline">
-                Chính sách bảo mật
-              </a>{" "}
-              của StoryVN.
+          {/* -------------------- MODE: FORGOT PASSWORD -------------------- */}
+          {mode === "forgot-password" && (
+            <div className="w-full my-auto py-2">
+              <header className="mb-6">
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Khôi phục mật khẩu</h2>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1.5">
+                  {forgotStep === "email"
+                    ? "Nhập email của bạn để nhận mã khôi phục tài khoản"
+                    : `Nhập mã xác thực đã gửi tới ${forgotEmail}`}
+                </p>
+              </header>
+
+              {forgotError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                  <span>{forgotError}</span>
+                </div>
+              )}
+
+              {forgotStep === "email" ? (
+                <form onSubmit={handleForgotEmailSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Email đăng ký
+                    </label>
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                        mail
+                      </span>
+                      <input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="vd: ban@example.com"
+                        required
+                        className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isForgotLoading}
+                    className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
+                  >
+                    {isForgotLoading ? "Đang gửi mã..." : "Gửi mã xác thực"}
+                  </button>
+
+                  <div className="text-center pt-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchMode("login")}
+                      className="text-xs sm:text-sm text-blue-600 font-semibold hover:underline cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                      <span>Quay lại đăng nhập</span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleForgotResetSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Mã xác thực OTP</label>
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                        pin
+                      </span>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={forgotOtp}
+                        onChange={(e) => setForgotOtp(e.target.value)}
+                        placeholder="Nhập 6 số OTP"
+                        required
+                        className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Mật khẩu mới
+                    </label>
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                        lock
+                      </span>
+                      <input
+                        type={showForgotNewPassword ? "text" : "password"}
+                        value={forgotNewPassword}
+                        onChange={(e) => setForgotNewPassword(e.target.value)}
+                        placeholder="Tối thiểu 8 ký tự"
+                        required
+                        className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                        className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer ml-1 p-0.5"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          {showForgotNewPassword ? "visibility_off" : "visibility"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Xác nhận mật khẩu mới
+                    </label>
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
+                        lock_reset
+                      </span>
+                      <input
+                        type={showForgotNewPassword ? "text" : "password"}
+                        value={forgotConfirmPassword}
+                        onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                        placeholder="Nhập lại mật khẩu mới"
+                        required
+                        className="w-full text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none p-0 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isForgotLoading}
+                    className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
+                  >
+                    {isForgotLoading ? "Đang xử lý..." : "Lưu mật khẩu mới"}
+                  </button>
+
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchMode("login")}
+                      className="text-xs sm:text-sm text-blue-600 font-semibold hover:underline cursor-pointer"
+                    >
+                      ← Quay lại đăng nhập
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 };

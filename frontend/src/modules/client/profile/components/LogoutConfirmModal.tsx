@@ -2,9 +2,9 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authApi } from "@/lib/api/auth";
-import { clearAuth } from "@/lib/auth/token";
-import { Button } from "@/components/ui/Button";
+import { authApi } from "@/modules/client/auth/services/auth.service";
+import { clearAuth } from "@/common/utils/token";
+import { Button } from "@/common/components/Button";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
 

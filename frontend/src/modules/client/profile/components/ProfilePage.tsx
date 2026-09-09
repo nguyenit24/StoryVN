@@ -14,6 +14,8 @@ import { EditProfileModal } from "./EditProfileModal";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { LogoutConfirmModal } from "./LogoutConfirmModal";
 import { UpgradeAuthorModal } from "./UpgradeAuthorModal";
+import { ClientHeader } from "@/components/layout/ClientHeader";
+import { ClientFooter } from "@/components/layout/ClientFooter";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -131,88 +133,8 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between">
-      {/* ==================== 1. HEADER (STORYVN STANDARD) ==================== */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 sm:px-8 py-3 transition-shadow">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#1d72fe] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                S
-              </div>
-              <span className="text-xl font-black tracking-tight text-slate-900">
-                StoryVN
-              </span>
-            </Link>
-
-            <nav className="hidden md:flex items-center gap-5 text-xs sm:text-sm font-semibold text-slate-600">
-              <Link href="/" className="hover:text-blue-600 transition-colors">
-                Khám phá
-              </Link>
-              <Link href="/#the-loai" className="hover:text-blue-600 transition-colors">
-                Thể loại
-              </Link>
-              <Link href="/#bang-xep-hang" className="hover:text-blue-600 transition-colors">
-                Bảng xếp hạng
-              </Link>
-              <Link href="/forum" className="hover:text-blue-600 transition-colors">
-                Diễn đàn
-              </Link>
-              <span className="text-blue-600 font-bold">Hồ sơ cá nhân</span>
-
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg font-bold hover:bg-purple-100 transition-colors flex items-center gap-1 text-xs"
-                >
-                  <span>🛡️</span>
-                  <span>Trang Quản Trị</span>
-                </Link>
-              )}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/"
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
-            >
-              ← Trang chủ
-            </Link>
-
-            {isReader && (
-              <button
-                type="button"
-                onClick={() => setIsUpgradeAuthorOpen(true)}
-                className="text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1"
-              >
-                <span>✍️</span>
-                <span>Nâng cấp Tác giả</span>
-              </button>
-            )}
-
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1"
-              >
-                <span>⚙️</span>
-                <span>Quản trị viên</span>
-              </Link>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setLogoutModalMode("current");
-                setIsLogoutModalOpen(true);
-              }}
-              className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
-            >
-              Đăng xuất
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* ==================== 1. SHARED UNIFIED CLIENT HEADER ==================== */}
+      <ClientHeader />
 
       {/* Success Notification Toast */}
       {successMsg && (
@@ -1044,6 +966,9 @@ export default function ProfilePage() {
           router.push("/");
         }}
       />
+
+      {/* Footer */}
+      <ClientFooter />
     </div>
   );
 }

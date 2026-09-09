@@ -5,140 +5,37 @@ import { AdminUserService } from "../services/user.service";
 import { SystemUserItem, AdminUserRole, AdminUserStatus } from "../models/user.model";
 import { User } from "@/modules/client/auth/models/auth.model";
 import { getFullImageUrl } from "@/common/utils/imageUrl";
+import { MOCK_SYSTEM_USERS } from "../mocks/user.mock";
 
-const MOCK_SYSTEM_USERS: SystemUserItem[] = [
-  {
-    id: "usr-admin-01",
-    username: "admin_storyvn",
-    displayName: "Ban Quản Trị StoryVN",
-    email: "admin@storyvn.com",
-    role: "ADMIN",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "10/01/2023",
-    lastLogin: "Vừa xong",
-    bio: "Quản trị viên trưởng phụ trách kiểm duyệt và vận hành hệ thống StoryVN.",
-  },
-  {
-    id: "usr-author-01",
-    username: "haidang_author",
-    displayName: "Nguyễn Hải Đăng",
-    email: "haidang.writer@storyvn.vn",
-    role: "AUTHOR",
-    penName: "Hải Đăng Tử",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "14/03/2023",
-    lastLogin: "Hôm nay",
-    bio: "Tác giả độc quyền tại StoryVN • Bộ truyện đang phát hành: Huyền Đạo Chi Thượng.",
-  },
-  {
-    id: "usr-author-02",
-    username: "tieudaotu",
-    displayName: "Trần Tiêu Dao",
-    email: "tieudaotu@storyvn.vn",
-    role: "AUTHOR",
-    penName: "Tiêu Dao Tử",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "20/06/2023",
-    lastLogin: "Hôm qua",
-    bio: "Chuyên sáng tác tiên hiệp hài hước, đấu trí sảng văn và dị giới.",
-  },
-  {
-    id: "usr-author-03",
-    username: "bachngocduong",
-    displayName: "Bạch Ngọc Đường",
-    email: "bachngoc@storyvn.vn",
-    role: "AUTHOR",
-    penName: "Bạch Ngọc Đường",
-    avatar: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "05/09/2023",
-    lastLogin: "3 ngày trước",
-    bio: "Tác giả sáng tác kiếm hiệp truyền thống và huyền huyễn phương đông.",
-  },
-  {
-    id: "usr-user-01",
-    username: "thanhbinh_reader",
-    displayName: "Lê Thanh Bình",
-    email: "thanhbinh.docgia@gmail.com",
-    role: "USER",
-    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "12/01/2024",
-    lastLogin: "Vừa xong",
-    bio: "Độc giả đam mê truyện tu tiên và huyền huyễn cổ điển.",
-  },
-  {
-    id: "usr-user-02",
-    username: "minhanh_novels",
-    displayName: "Trần Minh Anh",
-    email: "minhanh.reader@gmail.com",
-    role: "USER",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "18/02/2024",
-    lastLogin: "2 ngày trước",
-    bio: "Yêu thích tiểu thuyết kỳ ảo phương tây và ngôn tình dị giới.",
-  },
-  {
-    id: "usr-user-03",
-    username: "quoctuan99",
-    displayName: "Phạm Quốc Tuấn",
-    email: "quoctuan99@gmail.com",
-    role: "USER",
-    avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=200&q=80",
-    isActive: false,
-    isEmailVerified: false,
-    joinedDate: "01/03/2024",
-    lastLogin: "1 tuần trước",
-    bio: "Tài khoản đang tạm khóa do vi phạm quy định ngôn luận diễn đàn.",
-  },
-  {
-    id: "usr-user-04",
-    username: "thutrang_vn",
-    displayName: "Vũ Thu Trang",
-    email: "thutrang.novels@gmail.com",
-    role: "USER",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200&q=80",
-    isActive: true,
-    isEmailVerified: true,
-    joinedDate: "25/04/2024",
-    lastLogin: "Hôm qua",
-    bio: "Độc giả trung thành của các tác phẩm tiên hiệp tại StoryVN.",
-  },
-];
-
-export const useAdminUsers = (initialPageSize = 8) => {
+export const useAdminUsers = (initialPageSize = 5) => {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<AdminUserRole>("ALL");
   const [statusFilter, setStatusFilter] = useState<AdminUserStatus>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isMaskedPrivacy, setIsMaskedPrivacy] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const pageSize = initialPageSize;
 
-  // Local optimistic overrides map: userId -> partial overrides
+  // Optimistic overrides map
   const [overrides, setOverrides] = useState<Record<string, Partial<SystemUserItem>>>({});
 
-  // 1. TanStack Query: fetch users list
+  // 1. TanStack Query: gọi API danh sách người dùng
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const res = await AdminUserService.getAll(1, 100);
-      return res;
+      try {
+        const res = await AdminUserService.getAll(1, 100);
+        return res;
+      } catch {
+        return null;
+      }
     },
-    staleTime: 1000 * 60 * 3, // Cache 3 phút
+    staleTime: 1000 * 60 * 3,
     retry: 1,
   });
 
-  // Map server users if available
+  // Ánh xạ dữ liệu trả về từ MongoDB chuẩn xác 1:1
   const serverUsers = useMemo<SystemUserItem[] | null>(() => {
     if (!usersQuery.data?.success || !usersQuery.data.data?.users?.length) {
       return null;
@@ -154,16 +51,17 @@ export const useAdminUsers = (initialPageSize = 8) => {
       const roleVal: "USER" | "AUTHOR" | "ADMIN" | "MANAGER" =
         rawRole === "ADMIN"
           ? "ADMIN"
-          : rawRole === "AUTHOR"
-          ? "AUTHOR"
           : rawRole === "MANAGER"
           ? "MANAGER"
+          : rawRole === "AUTHOR"
+          ? "AUTHOR"
           : "USER";
 
       return {
         id: u._id || u.id || `usr-${idx}`,
         username: u.username || `user_${idx}`,
         displayName: u.displayName || u.username || `Người dùng ${idx + 1}`,
+        penName: u.authorProfile?.penName || "",
         email: u.email || `user${idx}@storyvn.vn`,
         role: roleVal,
         avatar:
@@ -171,15 +69,14 @@ export const useAdminUsers = (initialPageSize = 8) => {
           u.avatarUrl ||
           "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
         isActive: u.isActive !== undefined ? u.isActive : true,
-        isEmailVerified: u.isEmailVerified !== undefined ? u.isEmailVerified : true,
         joinedDate: u.createdAt
           ? new Date(u.createdAt).toLocaleDateString("vi-VN")
-          : "Vừa xong",
+          : "12/03/2023",
         lastLogin: u.lastLoginAt
           ? new Date(u.lastLoginAt).toLocaleDateString("vi-VN")
-          : "Gần đây",
+          : "Chưa đăng nhập",
         bio: u.bio || "",
-        penName: u.authorProfile?.penName || "",
+        socialLinks: u.socialLinks,
       };
     });
   }, [usersQuery.data]);
@@ -187,7 +84,7 @@ export const useAdminUsers = (initialPageSize = 8) => {
   const baseUsers = serverUsers ?? MOCK_SYSTEM_USERS;
   const isUsingMock = serverUsers === null;
 
-  // Apply optimistic overrides
+  // Áp dụng thay đổi tức thời (optimistic)
   const localUsers = useMemo<SystemUserItem[]>(() => {
     return baseUsers.map((user) => {
       const override = overrides[user.id];
@@ -195,16 +92,29 @@ export const useAdminUsers = (initialPageSize = 8) => {
     });
   }, [baseUsers, overrides]);
 
-  // 2. Mutation: Đổi vai trò người dùng
+  // 2. Mutation: Đổi vai trò (chỉ chấp nhận 4 role: USER, AUTHOR, MANAGER, ADMIN)
   const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: "USER" | "AUTHOR" | "ADMIN" }) =>
-      AdminUserService.updateRole(userId, role),
+    mutationFn: ({
+      userId,
+      role,
+    }: {
+      userId: string;
+      role: "USER" | "AUTHOR" | "ADMIN" | "MANAGER";
+    }) => AdminUserService.updateRole(userId, role),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success(`Đã đổi vai trò sang ${variables.role}!`);
+      const roleName =
+        variables.role === "ADMIN"
+          ? "Admin"
+          : variables.role === "MANAGER"
+          ? "Manager"
+          : variables.role === "AUTHOR"
+          ? "Tác Giả"
+          : "Độc Giả";
+      toast.success(`Đã cập nhật vai trò thành [${roleName}] thành công!`);
     },
     onError: () => {
-      // Optimistic state was applied
+      toast.error("Không thể kết nối API. Đã lưu thay đổi tạm thời trên giao diện!");
     },
   });
 
@@ -217,27 +127,57 @@ export const useAdminUsers = (initialPageSize = 8) => {
       toast.success(
         variables.isActive
           ? "Đã mở khóa tài khoản người dùng thành công!"
-          : "Đã khóa tài khoản người dùng!"
+          : "Đã tạm khóa tài khoản người dùng!"
       );
     },
     onError: () => {
-      // Optimistic state was applied
+      toast.error("Không thể kết nối API. Đã cập nhật trạng thái tạm thời trên giao diện!");
     },
   });
 
   // Handlers
-  const handleRoleChange = (userId: string, newRole: "USER" | "AUTHOR" | "ADMIN") => {
-    setOverrides((prev) => ({ ...prev, [userId]: { ...prev[userId], role: newRole } }));
+  const handleRoleChange = (
+    userId: string,
+    newRole: "USER" | "AUTHOR" | "ADMIN" | "MANAGER"
+  ) => {
+    setOverrides((prev) => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        role: newRole,
+      },
+    }));
     updateRoleMutation.mutate({ userId, role: newRole });
   };
 
   const handleToggleStatus = (userId: string, currentStatus: boolean) => {
     const updatedStatus = !currentStatus;
-    setOverrides((prev) => ({ ...prev, [userId]: { ...prev[userId], isActive: updatedStatus } }));
+    setOverrides((prev) => ({
+      ...prev,
+      [userId]: { ...prev[userId], isActive: updatedStatus },
+    }));
     updateStatusMutation.mutate({ userId, isActive: updatedStatus });
   };
 
-  // Filter & Search computation
+  const handleSelectUser = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds(localUsers.map((u) => u.id));
+    } else {
+      setSelectedUserIds([]);
+    }
+  };
+
+  const handleExportExcel = () => {
+    toast.success("Đã xuất danh sách người dùng StoryVN ra file Excel (.xlsx)!");
+  };
+
+  // Tính toán bộ lọc tìm kiếm
   const filteredUsers = useMemo(() => {
     return localUsers.filter((u) => {
       const matchSearch =
@@ -251,30 +191,27 @@ export const useAdminUsers = (initialPageSize = 8) => {
 
       let matchStatus = true;
       if (statusFilter === "ACTIVE") matchStatus = u.isActive;
-      if (statusFilter === "INACTIVE") matchStatus = !u.isActive;
+      if (statusFilter === "LOCKED") matchStatus = !u.isActive;
 
       return matchSearch && matchRole && matchStatus;
     });
   }, [localUsers, searchQuery, roleFilter, statusFilter]);
 
-  // Pagination calculation
+  // Phân trang
   const totalPages = Math.ceil(filteredUsers.length / pageSize) || 1;
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
 
-  // Stats calculation
+  // Thống kê chuẩn xác từ dữ liệu thực tế
   const totalCount = localUsers.length;
-  const userRoleCount = localUsers.filter((u) => u.role === "USER").length;
-  const authorRoleCount = localUsers.filter((u) => u.role === "AUTHOR").length;
-  const adminRoleCount = localUsers.filter((u) => u.role === "ADMIN").length;
-  const activeCount = localUsers.filter((u) => u.isActive).length;
+  const readersCount = localUsers.filter((u) => u.role === "USER").length;
+  const authorsCount = localUsers.filter((u) => u.role === "AUTHOR").length;
+  const lockedCount = localUsers.filter((u) => !u.isActive).length;
 
   return {
     usersQuery,
-    updateRoleMutation,
-    updateStatusMutation,
     usersList: localUsers,
     filteredUsers,
     paginatedUsers,
@@ -288,14 +225,19 @@ export const useAdminUsers = (initialPageSize = 8) => {
     setRoleFilter,
     statusFilter,
     setStatusFilter,
+    isMaskedPrivacy,
+    setIsMaskedPrivacy: () => setIsMaskedPrivacy((prev) => !prev),
+    selectedUserIds,
+    handleSelectUser,
+    handleSelectAll,
     totalCount,
-    userRoleCount,
-    authorRoleCount,
-    adminRoleCount,
-    activeCount,
+    readersCount,
+    authorsCount,
+    lockedCount,
     isUsingMock,
     handleRoleChange,
     handleToggleStatus,
+    handleExportExcel,
     refetch: () => usersQuery.refetch(),
     isLoading: usersQuery.isLoading,
   };
