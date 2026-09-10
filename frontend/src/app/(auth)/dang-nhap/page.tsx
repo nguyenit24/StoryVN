@@ -24,7 +24,7 @@ function LoginContent() {
   return <HomeView initialAuthMode="login" initialOpen={true} />;
 }
 
-export default function LoginPage() {
+export default function DangNhapPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-900" />}>
       <LoginContent />

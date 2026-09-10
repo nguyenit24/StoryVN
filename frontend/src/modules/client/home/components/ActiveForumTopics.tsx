@@ -44,7 +44,7 @@ export const ActiveForumTopics: React.FC = () => {
           </span>
           <h3 className="font-bold text-slate-900 text-base tracking-tight">Diễn Đàn Sôi Nổi</h3>
         </div>
-        <Link href="/forum" className="text-xs text-blue-600 font-semibold hover:underline">
+        <Link href="/dien-dan" className="text-xs text-blue-600 font-semibold hover:underline">
           Xem thêm
         </Link>
       </div>

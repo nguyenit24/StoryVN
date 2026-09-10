@@ -86,7 +86,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !user)) {
-      router.replace("/login?redirect=/me");
+      router.replace("/dang-nhap?redirect=/ho-so");
     }
   }, [isLoading, isAuthenticated, user, router]);
 
@@ -120,7 +120,7 @@ export default function ProfilePage() {
               Về trang chủ
             </Link>
             <Link
-              href="/login?redirect=/me"
+              href="/dang-nhap?redirect=/ho-so"
               className="px-5 py-2.5 rounded-xl bg-blue-600 text-xs sm:text-sm font-bold text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all"
             >
               Đăng nhập ngay

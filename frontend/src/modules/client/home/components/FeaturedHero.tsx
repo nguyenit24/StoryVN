@@ -159,7 +159,7 @@ export const FeaturedHero: React.FC = () => {
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
-              href={`/me`}
+              href="/ho-so"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">menu_book</span>

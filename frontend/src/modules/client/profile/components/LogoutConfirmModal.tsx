@@ -50,7 +50,7 @@ const LogoutConfirmDialog: React.FC<LogoutConfirmDialogProps> = ({
       setIsLoading(false);
       onSuccess?.();
       onClose();
-      router.push("/login");
+      router.push("/dang-nhap");
     }
   };
 
