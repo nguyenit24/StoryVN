@@ -5,6 +5,6 @@ export const metadata = {
   description: "Trang thông tin cá nhân, tác phẩm xuất bản, tủ sách và lịch sử đọc truyện.",
 };
 
-export default function MePage() {
+export default function HoSoPage() {
   return <ProfilePage />;
 }

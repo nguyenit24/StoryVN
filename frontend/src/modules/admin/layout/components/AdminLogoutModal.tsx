@@ -21,7 +21,7 @@ export default function AdminLogoutModal({ isOpen, onClose }: AdminLogoutModalPr
       await logout();
       toast.success("Đã đăng xuất khỏi cổng Quản trị!");
       onClose();
-      router.push("/login");
+      router.push("/dang-nhap");
     } catch {
       toast.error("Đã xảy ra lỗi khi đăng xuất!");
     }

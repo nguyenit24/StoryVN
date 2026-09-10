@@ -42,7 +42,12 @@ api.interceptors.response.use(
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       if (typeof window !== "undefined") {
         const path = window.location.pathname;
-        if (!path.includes("/login") && !path.includes("/register")) {
+        if (
+          !path.includes("/dang-nhap") &&
+          !path.includes("/dang-ky") &&
+          !path.includes("/login") &&
+          !path.includes("/register")
+        ) {
           clearAuth();
         }
       }

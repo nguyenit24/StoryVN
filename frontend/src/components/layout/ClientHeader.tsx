@@ -96,7 +96,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
   };
 
   const isHomeActive = pathname === "/";
-  const isForumActive = pathname?.startsWith("/forum");
+  const isForumActive = pathname?.startsWith("/dien-dan") || pathname?.startsWith("/forum");
 
   return (
     <>
@@ -152,7 +152,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
                 Bảng xếp hạng
               </Link>
               <Link
-                href="/forum"
+                href="/dien-dan"
                 className={`flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                   isForumActive ? "text-blue-600 font-semibold" : "hover:text-blue-600"
                 }`}
@@ -200,7 +200,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
 
             {/* Write Button */}
             <Link
-              href="/me"
+              href="/ho-so"
               className="hidden sm:inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-full transition-all active:scale-95 whitespace-nowrap shrink-0"
             >
               <span className="material-symbols-outlined text-[16px]">add</span>
@@ -237,7 +237,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
                       </div>
 
                       <Link
-                        href="/me"
+                        href="/ho-so"
                         onClick={() => setIsUserMenuOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       >
@@ -337,7 +337,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
                 Bảng xếp hạng
               </Link>
               <Link
-                href="/forum"
+                href="/dien-dan"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`px-3 py-2 rounded-lg hover:bg-slate-50 flex items-center justify-between ${
                   isForumActive ? "text-blue-600 font-semibold" : ""
@@ -361,7 +361,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
               )}
 
               <Link
-                href="/me"
+                href="/ho-so"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="sm:hidden px-3 py-2 rounded-lg bg-blue-50 text-blue-600 font-semibold flex items-center gap-1.5 mt-2"
               >

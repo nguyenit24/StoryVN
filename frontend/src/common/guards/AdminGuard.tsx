@@ -25,7 +25,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       toast.error("Vui lòng đăng nhập tài khoản Quản trị viên để truy cập!", {
         id: "admin-guard-unauth",
       });
-      router.replace(`/login?redirect=${encodeURIComponent(pathname || "/admin")}`);
+      router.replace(`/dang-nhap?redirect=${encodeURIComponent(pathname || "/admin")}`);
       return;
     }
 

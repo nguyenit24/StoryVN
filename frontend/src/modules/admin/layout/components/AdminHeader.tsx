@@ -188,7 +188,7 @@ export default function AdminHeader({
               </div>
 
               <Link
-                href="/me"
+                href="/ho-so"
                 onClick={() => setIsProfileMenuOpen(false)}
                 className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
               >
