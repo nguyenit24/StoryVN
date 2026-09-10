@@ -7,6 +7,13 @@ declare global {
 export const envConfig = {
   googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
 
+
+  googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    "",
+
   port: Number(process.env.PORT) || 5000,
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+  apiUrl:
+    typeof window !== "undefined"
+      ? "/api"
+      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api",
 };

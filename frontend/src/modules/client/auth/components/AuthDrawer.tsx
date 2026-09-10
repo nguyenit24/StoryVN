@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/modules/client/auth/services/auth.service";
 import { useAuth } from "@/context/AuthContext";
+import { envConfig } from "@/config/env.config";
 import toast from "react-hot-toast";
 
 interface GoogleIdConfig {
@@ -57,7 +58,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
   const router = useRouter();
   const { login } = useAuth();
 
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const googleClientId = envConfig.googleClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
   const googleLoginRef = useRef<HTMLDivElement>(null);
   const googleRegisterRef = useRef<HTMLDivElement>(null);
 
