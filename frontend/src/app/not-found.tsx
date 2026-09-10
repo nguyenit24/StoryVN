@@ -129,7 +129,7 @@ export default function NotFound() {
 
           {/* Button 2: Mở Tủ sách cá nhân */}
           <Link
-            href="/me"
+            href="/ho-so"
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium text-sm shadow-2xs hover:border-slate-300 active:scale-98 transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">menu_book</span>

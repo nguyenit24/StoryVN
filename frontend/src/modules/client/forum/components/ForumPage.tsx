@@ -87,7 +87,7 @@ export default function ForumPostPage() {
             Trang chủ
           </Link>
           <span>/</span>
-          <Link href="/forum" className="hover:text-blue-600">
+          <Link href="/dien-dan" className="hover:text-blue-600">
             Diễn đàn
           </Link>
           <span>/</span>

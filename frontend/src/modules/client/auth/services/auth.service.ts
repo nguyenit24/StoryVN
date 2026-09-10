@@ -77,6 +77,14 @@ export const AuthService = {
   async logoutAllSessions(): Promise<ApiResponse<null>> {
     return this.logout(undefined);
   },
+
+  async loginWithGoogle(dto: { credential: string }): Promise<ApiResponse<AuthLoginResponseData>> {
+    const res = await api.post<ApiResponse<AuthLoginResponseData>>(
+      API_ROUTES.AUTH.GOOGLE,
+      dto
+    );
+    return res.data;
+  },
 };
 
 // Backward compatibility alias

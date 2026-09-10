@@ -42,17 +42,23 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả thể loại");
   const [selectedQuickFilter, setSelectedQuickFilter] = useState<string | null>(null);
 
-  // Handle browser back/forward buttons for /login, /register
+  const authModePathMap: Record<AuthMode, string> = {
+    login: "/dang-nhap",
+    register: "/dang-ky",
+    "forgot-password": "/quen-mat-khau",
+  };
+
+  // Handle browser back/forward buttons for /dang-nhap, /dang-ky, /quen-mat-khau
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
-      if (path === "/login") {
+      if (path === "/dang-nhap" || path === "/login") {
         setAuthMode("login");
         setIsAuthOpen(true);
-      } else if (path === "/register") {
+      } else if (path === "/dang-ky" || path === "/register") {
         setAuthMode("register");
         setIsAuthOpen(true);
-      } else if (path === "/forgot-password") {
+      } else if (path === "/quen-mat-khau" || path === "/forgot-password") {
         setAuthMode("forgot-password");
         setIsAuthOpen(true);
       } else {
@@ -68,7 +74,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     setAuthMode(mode);
     setIsAuthOpen(true);
     if (typeof window !== "undefined") {
-      window.history.pushState(null, "", `/${mode}`);
+      window.history.pushState(null, "", authModePathMap[mode]);
     }
   };
 
@@ -145,7 +151,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
         isOpen={isAuthOpen}
         mode={authMode}
         onClose={closeAuth}
-        onSwitchMode={(mode) => setAuthMode(mode)}
+        onSwitchMode={(mode) => {
+          setAuthMode(mode);
+          if (typeof window !== "undefined") {
+            window.history.replaceState(null, "", authModePathMap[mode]);
+          }
+        }}
         onSuccess={() => {
           setIsAuthOpen(false);
           router.refresh();

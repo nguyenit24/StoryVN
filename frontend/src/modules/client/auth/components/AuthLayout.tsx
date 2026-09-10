@@ -16,8 +16,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   subtitle,
 }) => {
   const pathname = usePathname();
-  const isLogin = pathname?.includes("/login");
-  const isRegister = pathname?.includes("/register");
+  const isLogin = pathname?.includes("/dang-nhap") || pathname?.includes("/login");
+  const isRegister = pathname?.includes("/dang-ky") || pathname?.includes("/register");
 
   return (
     <div className="min-h-screen w-full bg-zinc-100 flex flex-col justify-between text-zinc-900 font-sans relative selection:bg-zinc-900 selection:text-white">
@@ -65,7 +65,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           {/* Navigation Tab: Login vs Register */}
           <div className="grid grid-cols-2 border-b border-zinc-200 text-xs font-bold uppercase tracking-wider text-center">
             <Link
-              href="/login"
+              href="/dang-nhap"
               className={`py-3.5 border-r border-zinc-200 transition-colors ${isLogin
                   ? "bg-zinc-950 text-white font-bold"
                   : "bg-zinc-50 text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100"
@@ -74,7 +74,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
               Đăng nhập
             </Link>
             <Link
-              href="/register"
+              href="/dang-ky"
               className={`py-3.5 transition-colors ${isRegister
                   ? "bg-zinc-950 text-white font-bold"
                   : "bg-zinc-50 text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100"

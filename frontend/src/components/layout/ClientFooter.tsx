@@ -78,7 +78,7 @@ export const ClientFooter: React.FC = () => {
             </h5>
             <ul className="space-y-2 text-xs text-slate-500">
               <li>
-                <Link href="/me" className="hover:text-blue-600 transition-colors">
+                <Link href="/ho-so" className="hover:text-blue-600 transition-colors">
                   Creator Studio
                 </Link>
               </li>
@@ -98,7 +98,7 @@ export const ClientFooter: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/forum" className="hover:text-blue-600 transition-colors">
+                <Link href="/dien-dan" className="hover:text-blue-600 transition-colors">
                   Học viện sáng tác
                 </Link>
               </li>

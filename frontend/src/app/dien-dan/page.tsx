@@ -5,6 +5,6 @@ export const metadata = {
   description: "Cộng đồng trao đổi kinh nghiệm sáng tác và thảo luận văn học số StoryVN.",
 };
 
-export default function ForumRoute() {
+export default function DienDanRoute() {
   return <ForumPage />;
 }

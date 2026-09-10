@@ -1,10 +1,41 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/modules/client/auth/services/auth.service";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
+
+interface GoogleIdConfig {
+  client_id: string;
+  callback: (response: { credential?: string }) => void;
+  auto_select?: boolean;
+  cancel_on_tap_outside?: boolean;
+}
+
+interface GoogleButtonOptions {
+  type?: string;
+  shape?: string;
+  theme?: string;
+  text?: string;
+  size?: string;
+  logo_alignment?: string;
+  width?: number;
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: GoogleIdConfig) => void;
+          renderButton: (parent: HTMLElement, options: GoogleButtonOptions) => void;
+          prompt: (momentListener?: (notification: unknown) => void) => void;
+        };
+      };
+    };
+  }
+}
 
 export type AuthMode = "login" | "register" | "forgot-password";
 
@@ -25,6 +56,10 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
 }) => {
   const router = useRouter();
   const { login } = useAuth();
+
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const googleLoginRef = useRef<HTMLDivElement>(null);
+  const googleRegisterRef = useRef<HTMLDivElement>(null);
 
   // -------------------- LOGIN STATE --------------------
   const [loginIdentity, setLoginIdentity] = useState("");
@@ -58,6 +93,17 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [isForgotLoading, setIsForgotLoading] = useState(false);
 
+  const clearErrors = useCallback(() => {
+    setLoginError(null);
+    setRegError(null);
+    setForgotError(null);
+  }, []);
+
+  const handleSwitchMode = (newMode: AuthMode) => {
+    clearErrors();
+    onSwitchMode(newMode);
+  };
+
   // -------------------- EFFECTS --------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,18 +132,88 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, mode, regStep, countdown]);
 
+  const handleGoogleCredentialResponse = useCallback(
+    async (response: { credential?: string }) => {
+      if (!response?.credential) {
+        toast.error("Không nhận được mã xác thực từ Google");
+        return;
+      }
+
+      clearErrors();
+      setIsLoginLoading(true);
+
+      try {
+        const res = await authApi.loginWithGoogle({ credential: response.credential });
+        if (res.success && res.data) {
+          toast.success("Đăng nhập với Google thành công!");
+          login(res.data.accessToken, res.data.refreshToken, res.data.user);
+          setTimeout(() => {
+            onClose();
+            if (onSuccess) onSuccess();
+            else router.refresh();
+          }, 200);
+        } else {
+          const msg = res.message || "Đăng nhập Google thất bại";
+          if (mode === "register") setRegError(msg);
+          else setLoginError(msg);
+          toast.error(msg);
+        }
+      } catch (err: unknown) {
+        const errorObj = err as { response?: { data?: { message?: string } } };
+        const msg = errorObj.response?.data?.message || "Đăng nhập Google thất bại. Vui lòng thử lại.";
+        if (mode === "register") setRegError(msg);
+        else setLoginError(msg);
+        toast.error(msg);
+      } finally {
+        setIsLoginLoading(false);
+      }
+    },
+    [clearErrors, login, mode, onClose, onSuccess, router]
+  );
+
+  useEffect(() => {
+    if (!isOpen || !googleClientId) return;
+
+    const renderGoogleButton = () => {
+      if (typeof window !== "undefined" && window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        const targetRef = mode === "register" ? googleRegisterRef.current : googleLoginRef.current;
+        if (targetRef) {
+          targetRef.innerHTML = "";
+          window.google.accounts.id.renderButton(targetRef, {
+            type: "standard",
+            shape: "rectangular",
+            theme: "outline",
+            text: mode === "register" ? "signup_with" : "signin_with",
+            size: "large",
+            logo_alignment: "left",
+            width: targetRef.offsetWidth > 250 ? targetRef.offsetWidth : 360,
+          });
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+    } else {
+      const timer = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          renderGoogleButton();
+          clearInterval(timer);
+        }
+      }, 300);
+      return () => clearInterval(timer);
+    }
+  }, [isOpen, mode, googleClientId, handleGoogleCredentialResponse]);
+
   if (!isOpen) return null;
 
-  const clearErrors = () => {
-    setLoginError(null);
-    setRegError(null);
-    setForgotError(null);
-  };
-
-  const handleSwitchMode = (newMode: AuthMode) => {
-    clearErrors();
-    onSwitchMode(newMode);
-  };
 
   // -------------------- LOGIN HANDLER --------------------
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -303,18 +419,30 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
   };
 
   const handleSocialClick = (provider: string) => {
-    toast(`Đang kết nối cổng đăng nhập ${provider}...`, { icon: "🔗" });
+    if (provider === "Google") {
+      if (!googleClientId) {
+        toast.error("Vui lòng cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID trong file .env");
+        return;
+      }
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.prompt();
+      } else {
+        toast("Đang kết nối cổng đăng nhập Google...", { icon: "🔗" });
+      }
+    } else {
+      toast(`Tính năng đăng nhập với ${provider} đang được phát triển`, { icon: "ℹ️" });
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 select-none animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 select-none animate-fadeIn">
       {/* Background Click to dismiss */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Main Dialog Wrapper (Spacious, tall, elegant) */}
+      {/* Main Dialog Wrapper (Squarer & Elevated 3D Floating Pop-up) */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-4xl xl:max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col md:flex-row min-h-[580px] md:min-h-[660px] max-h-[92vh]"
+        className="relative z-10 w-full max-w-4xl xl:max-w-5xl bg-white rounded-lg shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5),0_10px_25px_-5px_rgba(15,23,42,0.3)] overflow-hidden border border-slate-200 ring-1 ring-black/5 flex flex-col md:flex-row min-h-[580px] md:min-h-[660px] max-h-[92vh] animate-modalPop"
       >
         {/* ==================== LEFT COLUMN: ARTISTIC SHOWCASE ==================== */}
         <div className="hidden md:flex md:w-5/12 lg:w-1/2 relative bg-slate-950 overflow-hidden flex-col justify-between p-8 lg:p-10 text-white shrink-0">
@@ -333,7 +461,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
           {/* Top Brand Header (Clean, no Tac quyen badge) */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/30">
+              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/30">
                 S
               </div>
               <div>
@@ -373,7 +501,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+            className="absolute top-4 right-4 z-20 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
             aria-label="Đóng cửa sổ"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
@@ -390,7 +518,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
               </header>
 
               {loginError && (
-                <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2.5">
+                <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
                   <span>{loginError}</span>
                 </div>
@@ -402,7 +530,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                     Email hoặc Tên đăng nhập
                   </label>
-                  <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                  <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                     <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                       account_circle
                     </span>
@@ -422,7 +550,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                     Mật khẩu
                   </label>
-                  <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                  <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                     <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                       lock
                     </span>
@@ -471,7 +599,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                 <button
                   type="submit"
                   disabled={isLoginLoading}
-                  className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-md shadow-blue-600/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs sm:text-sm rounded-lg transition shadow-md shadow-blue-600/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {isLoginLoading ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -494,19 +622,25 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
               </div>
 
               {/* ONLY Google Social Button */}
-              <button
-                type="button"
-                onClick={() => handleSocialClick("Google")}
-                className="w-full flex items-center justify-center gap-3 py-2.5 sm:py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                </svg>
-                <span>Đăng nhập với Google</span>
-              </button>
+              {googleClientId ? (
+                <div className="w-full flex justify-center items-center min-h-[44px]">
+                  <div ref={googleLoginRef} className="w-full flex justify-center" />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSocialClick("Google")}
+                  className="w-full flex items-center justify-center gap-3 py-2.5 sm:py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
+                >
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                  </svg>
+                  <span>Đăng nhập với Google</span>
+                </button>
+              )}
 
               {/* Switch to Register */}
               <div className="mt-5 text-center">
@@ -540,7 +674,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   </header>
 
                   {regError && (
-                    <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
+                    <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
                       <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
                       <span>{regError}</span>
                     </div>
@@ -552,7 +686,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Tên tài khoản / Biệt danh <span className="text-rose-500">*</span>
                       </label>
-                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                         <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                           person
                         </span>
@@ -572,7 +706,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Địa chỉ Email <span className="text-rose-500">*</span>
                       </label>
-                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                         <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                           mail
                         </span>
@@ -592,7 +726,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Mật khẩu <span className="text-rose-500">*</span>
                       </label>
-                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                         <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                           lock
                         </span>
@@ -622,7 +756,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Xác nhận mật khẩu <span className="text-rose-500">*</span>
                       </label>
-                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                      <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                         <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                           lock_reset
                         </span>
@@ -667,7 +801,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                     <button
                       type="submit"
                       disabled={isRegLoading}
-                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     >
                       {isRegLoading ? (
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -693,19 +827,25 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   </div>
 
                   {/* ONLY Google Social Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleSocialClick("Google")}
-                    className="w-full flex items-center justify-center gap-3 py-2.5 sm:py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
-                  >
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                    </svg>
-                    <span>Đăng ký với Google</span>
-                  </button>
+                  {googleClientId ? (
+                    <div className="w-full flex justify-center items-center min-h-[44px]">
+                      <div ref={googleRegisterRef} className="w-full flex justify-center" />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSocialClick("Google")}
+                      className="w-full flex items-center justify-center gap-3 py-2.5 sm:py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
+                    >
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                      </svg>
+                      <span>Đăng ký với Google</span>
+                    </button>
+                  )}
 
                   {/* Switch to Login */}
                   <div className="pt-4 text-center">
@@ -725,7 +865,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                 /* OTP Verification Substep with icon */
                 <form onSubmit={handleOtpVerify} className="space-y-4 py-2">
                   <header>
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
                       <span className="material-symbols-outlined text-[28px]">mark_email_read</span>
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900">Xác thực mã OTP</h2>
@@ -735,7 +875,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   </header>
 
                   {regError && (
-                    <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
+                    <div className="p-3 rounded-lg bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
                       <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
                       <span>{regError}</span>
                     </div>
@@ -745,7 +885,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Mã xác thực OTP
                     </label>
-                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-4 py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-4 py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                       <span className="material-symbols-outlined text-[20px] text-slate-400 mr-3 shrink-0">
                         pin
                       </span>
@@ -771,7 +911,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   <button
                     type="submit"
                     disabled={isRegLoading}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-lg cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
                   >
                     {isRegLoading ? "Đang xác thực..." : "Kích hoạt tài khoản"}
                   </button>
@@ -803,7 +943,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
               </header>
 
               {forgotError && (
-                <div className="mb-4 p-3 rounded-xl bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
+                <div className="mb-4 p-3 rounded-lg bg-rose-50 text-rose-700 text-xs sm:text-sm font-medium flex items-center gap-2">
                   <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
                   <span>{forgotError}</span>
                 </div>
@@ -815,7 +955,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                       Email đăng ký
                     </label>
-                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 sm:py-3 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                       <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                         mail
                       </span>
@@ -833,7 +973,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   <button
                     type="submit"
                     disabled={isForgotLoading}
-                    className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
+                    className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-lg cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
                   >
                     {isForgotLoading ? "Đang gửi mã..." : "Gửi mã xác thực"}
                   </button>
@@ -853,7 +993,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                 <form onSubmit={handleForgotResetSubmit} className="space-y-3.5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Mã xác thực OTP</label>
-                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                       <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                         pin
                       </span>
@@ -873,7 +1013,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Mật khẩu mới
                     </label>
-                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                       <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                         lock
                       </span>
@@ -901,7 +1041,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Xác nhận mật khẩu mới
                     </label>
-                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-xl px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                    <div className="relative flex items-center border border-slate-300 hover:border-slate-400 rounded-lg px-3.5 py-2.5 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                       <span className="material-symbols-outlined text-[20px] text-slate-400 mr-2.5 shrink-0">
                         lock_reset
                       </span>
@@ -919,7 +1059,7 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
                   <button
                     type="submit"
                     disabled={isForgotLoading}
-                    className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
+                    className="w-full py-3 sm:py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-lg cursor-pointer transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
                   >
                     {isForgotLoading ? "Đang xử lý..." : "Lưu mật khẩu mới"}
                   </button>

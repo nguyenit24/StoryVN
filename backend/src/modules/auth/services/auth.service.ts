@@ -23,6 +23,7 @@ import { RoleType } from '../../roles/schemas/role.schema.js';
 import { MailService } from '../../../infrastructure/mail/mail.service.js';
 import { RedisService } from '../../../infrastructure/redis/redis.service.js';
 import { parseDurationToMs } from '../../../common/utils/time.utils.js';
+import { OAuth2Client } from 'google-auth-library';
 
 import { RegisterDto } from '../dto/register.dto.js';
 import { VerifyOtpDto } from '../dto/verify-otp.dto.js';
@@ -30,6 +31,7 @@ import { LoginDto } from '../dto/login.dto.js';
 import { RefreshTokenDto } from '../dto/refresh-token.dto.js';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto.js';
 import { ResetPasswordDto } from '../dto/reset-password.dto.js';
+import { GoogleLoginDto } from '../dto/google-login.dto.js';
 
 interface RefreshTokenPayload {
   sub: string;
@@ -67,6 +69,8 @@ export class AuthService {
   private readonly refreshTtlMs: number;
   private readonly otpExpiresInSeconds: number;
   private readonly otpMaxAttempts: number;
+  private readonly googleClientId: string;
+  private readonly googleClient: OAuth2Client;
 
   constructor(
     @InjectModel(User.name)
@@ -87,6 +91,8 @@ export class AuthService {
     this.refreshTtlMs = parseDurationToMs(this.refreshExpiresIn, 7 * 24 * 60 * 60 * 1000);
     this.otpExpiresInSeconds = Number(this.configService.get<number>('OTP_EXPIRES_IN_SECONDS') ?? 300);
     this.otpMaxAttempts = Number(this.configService.get<number>('OTP_MAX_ATTEMPTS') ?? 5);
+    this.googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID') || '';
+    this.googleClient = new OAuth2Client(this.googleClientId);
   }
 
   async generateTokens(
@@ -534,6 +540,103 @@ export class AuthService {
       success: true,
       message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập với mật khẩu mới.',
       data: null,
+    };
+  }
+
+  async loginWithGoogle(dto: GoogleLoginDto) {
+    if (!this.googleClientId) {
+      throw new BadRequestException('Chưa cấu hình GOOGLE_CLIENT_ID trên hệ thống');
+    }
+
+    let payload: any;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: dto.credential.trim(),
+        audience: this.googleClientId,
+      });
+      payload = ticket.getPayload();
+    } catch (error: any) {
+      this.logger.error(`Lỗi xác thực Google ID Token: ${error?.message}`);
+      throw new UnauthorizedException('Google ID Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (!payload?.email) {
+      throw new UnauthorizedException('Tài khoản Google không cung cấp email');
+    }
+
+    const isEmailVerified = payload.email_verified === true || payload.email_verified === 'true';
+    if (!isEmailVerified) {
+      throw new UnauthorizedException('Email Google chưa được xác thực');
+    }
+
+    const email = payload.email.toLowerCase().trim();
+
+    let user = await this.userModel.findOne({ email }).exec();
+
+    if (user) {
+      if (!user.isActive) {
+        throw new ForbiddenException('Tài khoản đang bị khóa hoặc chưa được kích hoạt');
+      }
+
+      if (!user.avatar && payload.picture) {
+        user.avatar = payload.picture;
+      }
+      user.lastLoginAt = new Date();
+      await user.save();
+    } else {
+      const rawBase = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'user';
+      const baseUsername = rawBase.length < 3 ? `${rawBase}user` : rawBase.slice(0, 20);
+
+      let candidateUsername = baseUsername;
+      let existingUsername = await this.userModel.exists({ username: candidateUsername });
+      while (existingUsername) {
+        candidateUsername = `${baseUsername.slice(0, 15)}_${crypto.randomInt(1000, 9999)}`;
+        existingUsername = await this.userModel.exists({ username: candidateUsername });
+      }
+
+      const userRole = await this.rolesService.findByName(RoleType.USER);
+      if (!userRole) {
+        throw new BadRequestException('Vai trò người dùng mặc định không tồn tại trong hệ thống');
+      }
+
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = await this.userModel.create({
+        username: candidateUsername,
+        email,
+        password: hashedPassword,
+        displayName: payload.name?.trim() || candidateUsername,
+        avatar: payload.picture || '',
+        roleId: userRole._id,
+        isActive: true,
+        tokenVersion: 0,
+        lastLoginAt: new Date(),
+      });
+    }
+
+    const role = await this.rolesService.findById(user.roleId);
+    const roleName = role ? role.name : RoleType.USER;
+
+    const { accessToken, refreshToken } = await this.generateTokens(
+      user._id.toString(),
+      roleName,
+      user.tokenVersion ?? 0,
+    );
+
+    return {
+      success: true,
+      message: 'Đăng nhập thành công',
+      data: {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user._id.toString(),
+          username: user.username,
+          email: user.email,
+          role: roleName,
+        },
+      },
     };
   }
 }

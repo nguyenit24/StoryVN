@@ -16,6 +16,7 @@ import { RefreshTokenDto } from '../dto/refresh-token.dto.js';
 import { LogoutDto } from '../dto/logout.dto.js';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto.js';
 import { ResetPasswordDto } from '../dto/reset-password.dto.js';
+import { GoogleLoginDto } from '../dto/google-login.dto.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 
 @ApiTags('Auth')
@@ -73,5 +74,12 @@ export class AuthController {
   async logout(@Req() req: any, @Body() body: LogoutDto) {
     const { sub, jti, exp } = req.user;
     return this.authService.logout(sub, jti, exp, body?.refreshToken);
+  }
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng nhập tài khoản bằng Google ID Token (Credential)' })
+  async googleLogin(@Body() dto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(dto);
   }
 }
