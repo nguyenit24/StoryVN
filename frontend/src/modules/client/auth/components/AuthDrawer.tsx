@@ -421,7 +421,8 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
   const handleSocialClick = (provider: string) => {
     if (provider === "Google") {
       if (!googleClientId) {
-        toast.error("Vui lòng cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID trong file .env");
+        console.warn("[StoryVN] Chưa tải hoặc chưa cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID trong file .env");
+        toast.error("Cổng đăng nhập Google đang được kết nối, vui lòng thử lại sau giây lát.");
         return;
       }
       if (window.google?.accounts?.id) {
