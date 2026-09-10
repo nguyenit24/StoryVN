@@ -51,6 +51,7 @@ jobs:
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_API_URL=/api \
+            --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }} \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/storyvn-frontend:latest \
             ./frontend
 
