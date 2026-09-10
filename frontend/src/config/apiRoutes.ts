@@ -31,4 +31,24 @@ export const API_ROUTES = {
     DASHBOARD_OVERVIEW: "/admin/dashboard/overview",
     DASHBOARD_EXPORT: "/admin/dashboard/export",
   },
+  CATEGORIES: {
+    LIST: "/categories",
+    CREATE: "/categories",
+    SEED: "/categories/seed",
+    UPDATE: (id: string) => `/categories/${id}`,
+    DELETE: (id: string) => `/categories/${id}`,
+  },
+  TAGS: {
+    LIST: "/tags",
+    CREATE: "/tags",
+    SEED: "/tags/seed",
+    UPDATE: (id: string) => `/tags/${id}`,
+    DELETE: (id: string) => `/tags/${id}`,
+  },
+  STORIES: {
+    ADMIN_LIST: "/stories",
+    DELETE: (id: string) => `/stories/${id}`,
+    MY_LIST: "/stories/my",
+    MY_BY_SLUG: (slug: string) => `/stories/my/${slug}`,
+  },
 } as const;

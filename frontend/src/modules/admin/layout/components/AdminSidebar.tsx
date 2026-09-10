@@ -25,14 +25,21 @@ const MAIN_NAV_ITEMS: NavItem[] = [
     label: "Quản lý tác phẩm",
     href: "/admin/stories",
     icon: "auto_stories",
-    badge: 9,
-    badgeColor: "bg-red-100 text-red-700",
+  },
+  {
+    label: "Quản lý thể loại",
+    href: "/admin/categories",
+    icon: "category",
+  },
+  {
+    label: "Quản lý thẻ tag",
+    href: "/admin/tags",
+    icon: "label",
   },
   {
     label: "Quản lý người dùng",
     href: "/admin/users",
     icon: "group",
-    badge: "382.9k",
     badgeColor: "text-slate-400 font-medium",
   },
   {
@@ -95,25 +102,25 @@ export default function AdminSidebar({
 
       {/* Aside container: co giãn linh hoạt w-64 khi mở và w-20 khi thu gọn chỉ còn icon */}
       <aside
-        className={`fixed inset-y-0 left-0 bg-white border-r border-slate-200 z-40 flex flex-col justify-between transition-all duration-300 ease-in-out ${
-          isCollapsed ? "w-20" : "w-64"
-        } ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed inset-y-0 left-0 bg-white border-r border-slate-200 z-40 flex flex-col justify-between transition-all duration-300 ease-in-out ${isCollapsed ? "w-20" : "w-64"
+          } ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div className="flex flex-col h-full">
           {/* Logo Header */}
           <div
-            className={`h-16 flex items-center border-b border-slate-100 transition-all duration-300 ${
-              isCollapsed ? "px-0 justify-center" : "px-5 justify-between"
-            }`}
+            className={`h-16 flex items-center border-b border-slate-100 transition-all duration-300 ${isCollapsed ? "px-0 justify-center" : "px-5 justify-between"
+              }`}
           >
             <Link
               href="/admin"
               className={`flex items-center gap-3 group ${isCollapsed ? "justify-center" : ""}`}
               title="StoryVN Admin Portal"
             >
-              <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
-                S
-              </div>
+              <img
+                src="/logo.png"
+                alt="StoryVN Logo"
+                className="w-9 h-9 object-contain group-hover:scale-105 transition-transform flex-shrink-0"
+              />
               {!isCollapsed && (
                 <div className="flex flex-col overflow-hidden whitespace-nowrap">
                   <span className="font-bold text-slate-900 text-base leading-tight">StoryVN</span>
@@ -149,9 +156,8 @@ export default function AdminSidebar({
 
           {/* Navigation Menu */}
           <div
-            className={`flex-1 px-3 py-4 space-y-6 ${
-              isCollapsed ? "overflow-visible" : "overflow-y-auto"
-            }`}
+            className={`flex-1 px-3 py-4 space-y-6 ${isCollapsed ? "overflow-visible" : "overflow-y-auto"
+              }`}
           >
             {/* Main Navigation */}
             <div>
@@ -171,21 +177,18 @@ export default function AdminSidebar({
                       href={item.href}
                       onClick={onCloseMobile}
                       title={item.label}
-                      className={`relative flex items-center rounded-xl text-sm transition-all duration-200 group ${
-                        isCollapsed
+                      className={`relative flex items-center rounded-xl text-sm transition-all duration-200 group ${isCollapsed
                           ? "w-11 h-11 mx-auto justify-center"
                           : "justify-between px-3 py-2.5"
-                      } ${
-                        active
+                        } ${active
                           ? "bg-blue-50 text-blue-700 font-semibold"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                      }`}
+                        }`}
                     >
                       <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
                         <span
-                          className={`material-symbols-outlined text-[22px] flex-shrink-0 ${
-                            active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
-                          }`}
+                          className={`material-symbols-outlined text-[22px] flex-shrink-0 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                            }`}
                         >
                           {item.icon}
                         </span>
@@ -195,9 +198,8 @@ export default function AdminSidebar({
                       {/* Expanded Badge */}
                       {!isCollapsed && item.badge && (
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                            item.badgeColor || "bg-red-100 text-red-700"
-                          }`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${item.badgeColor || "bg-red-100 text-red-700"
+                            }`}
                         >
                           {item.badge}
                         </span>
@@ -243,20 +245,17 @@ export default function AdminSidebar({
                       href={item.href}
                       onClick={onCloseMobile}
                       title={item.label}
-                      className={`relative flex items-center rounded-xl text-sm transition-all duration-200 group ${
-                        isCollapsed
+                      className={`relative flex items-center rounded-xl text-sm transition-all duration-200 group ${isCollapsed
                           ? "w-11 h-11 mx-auto justify-center"
                           : "gap-3 px-3 py-2"
-                      } ${
-                        active
+                        } ${active
                           ? "bg-blue-50 text-blue-700 font-semibold"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                      }`}
+                        }`}
                     >
                       <span
-                        className={`material-symbols-outlined text-[22px] flex-shrink-0 ${
-                          active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
-                        }`}
+                        className={`material-symbols-outlined text-[22px] flex-shrink-0 ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                          }`}
                       >
                         {item.icon}
                       </span>
@@ -281,11 +280,10 @@ export default function AdminSidebar({
               type="button"
               onClick={() => setIsLogoutModalOpen(true)}
               title="Đăng xuất khỏi hệ thống"
-              className={`flex items-center rounded-xl bg-slate-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-700 border border-slate-200 text-sm font-medium transition-colors shadow-2xs ${
-                isCollapsed
+              className={`flex items-center rounded-xl bg-slate-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-700 border border-slate-200 text-sm font-medium transition-colors shadow-2xs ${isCollapsed
                   ? "w-11 h-11 mx-auto justify-center p-0"
                   : "w-full justify-center gap-2 py-2.5 px-3"
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-[20px] flex-shrink-0">logout</span>
               {!isCollapsed && <span>Đăng xuất</span>}

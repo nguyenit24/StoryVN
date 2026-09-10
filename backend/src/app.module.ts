@@ -10,6 +10,9 @@ import { RolesModule } from './modules/roles/roles.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { AuthorsModule } from './modules/authors/authors.module.js';
+import { CategoriesModule } from './modules/categories/categories.module.js';
+import { TagsModule } from './modules/tags/tags.module.js';
+import { StoriesModule } from './modules/stories/stories.module.js';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { AuthorsModule } from './modules/authors/authors.module.js';
     UsersModule,
     AuthModule,
     AuthorsModule,
+    CategoriesModule,
+    TagsModule,
+    StoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

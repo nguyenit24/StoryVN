@@ -105,6 +105,7 @@ export default function UsersTable({
                   className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-3.5 h-3.5"
                 />
               </th>
+              <th className="py-3 px-3 w-12 text-center">STT</th>
               <th className="py-3 px-4">Người dùng &amp; Bút danh</th>
               <th className="py-3 px-4">Email</th>
               <th className="py-3 px-4">Vai trò</th>
@@ -115,7 +116,8 @@ export default function UsersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 text-xs text-slate-700">
-            {users.map((u) => {
+            {users.map((u, index) => {
+              const stt = (currentPage - 1) * pageSize + index + 1;
               const isSelected = selectedUserIds.includes(u.id);
               const isLocked = !u.isActive;
               const roleInfo = getRoleBadge(u.role);
@@ -137,6 +139,11 @@ export default function UsersTable({
                       onChange={() => onSelectUser(u.id)}
                       className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-3.5 h-3.5"
                     />
+                  </td>
+
+                  {/* STT */}
+                  <td className="py-3.5 px-3 text-center font-mono text-xs text-slate-400 font-semibold">
+                    {stt}
                   </td>
 
                   {/* User & Pen name */}

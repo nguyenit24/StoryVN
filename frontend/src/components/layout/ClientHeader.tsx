@@ -119,11 +119,13 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({
             {/* Logo */}
             <Link
               href="/"
-              className="flex items-center gap-2 text-slate-900 font-bold text-xl sm:text-2xl tracking-tight shrink-0 whitespace-nowrap"
+              className="flex items-center gap-2.5 text-slate-900 font-bold text-xl sm:text-2xl tracking-tight shrink-0 whitespace-nowrap group"
             >
-              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/30 shrink-0">
-                <span className="font-extrabold text-xl leading-none">S</span>
-              </div>
+              <img
+                src="/logo.png"
+                alt="StoryVN Logo"
+                className="w-9 h-9 object-contain shrink-0 group-hover:scale-105 transition-transform"
+              />
               <span className="whitespace-nowrap">
                 Story<span className="text-blue-600">VN</span>
               </span>

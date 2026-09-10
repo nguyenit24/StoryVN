@@ -6,6 +6,7 @@ import { authApi } from "@/modules/client/auth/services/auth.service";
 import { setTokens, setStoredUser } from "@/common/utils/token";
 import { User } from "@/types/auth";
 import { useAuth } from "@/context/AuthContext";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface UpgradeAuthorModalProps {
   isOpen: boolean;
@@ -137,15 +138,8 @@ export const UpgradeAuthorModal: React.FC<UpgradeAuthorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-      <div
-        className="fixed inset-0"
-        onClick={() => {
-          if (!isLoading) onClose();
-        }}
-      />
-
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 animate-scaleUp">
+    <ModalPortal isOpen={isOpen} onClose={isLoading ? undefined : onClose}>
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 animate-modalPop">
         {/* Modal Header */}
         <div className="relative px-6 pt-6 pb-4 border-b border-slate-100 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent">
           <div className="flex items-center justify-between">
@@ -294,6 +288,6 @@ export const UpgradeAuthorModal: React.FC<UpgradeAuthorModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </ModalPortal>
   );
 };

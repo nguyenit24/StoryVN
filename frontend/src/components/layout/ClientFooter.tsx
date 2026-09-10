@@ -12,11 +12,13 @@ export const ClientFooter: React.FC = () => {
           <div className="lg:col-span-2 space-y-3">
             <Link
               href="/"
-              className="flex items-center gap-2 text-slate-900 font-bold text-xl tracking-tight"
+              className="flex items-center gap-2.5 text-slate-900 font-bold text-xl tracking-tight group"
             >
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-                <span className="font-extrabold text-lg">S</span>
-              </div>
+              <img
+                src="/logo.png"
+                alt="StoryVN Logo"
+                className="w-8 h-8 object-contain shrink-0 group-hover:scale-105 transition-transform"
+              />
               <span>
                 Story<span className="text-blue-600">VN</span>
               </span>

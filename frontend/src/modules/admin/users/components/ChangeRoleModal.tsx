@@ -2,16 +2,17 @@
 
 import React, { useState } from "react";
 import { SystemUserItem } from "../models/user.model";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface ChangeRoleModalProps {
   user: SystemUserItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (userId: string, newRole: "USER" | "AUTHOR" | "ADMIN" | "MANAGER") => void;
+  onConfirm: (userId: string, newRole: "USER" | "ADMIN" | "MANAGER") => void;
 }
 
-const FOUR_ROLES: {
-  role: "USER" | "AUTHOR" | "ADMIN" | "MANAGER";
+const ADMIN_ASSIGNABLE_ROLES: {
+  role: "USER" | "ADMIN" | "MANAGER";
   name: string;
   badge: string;
   badgeClass: string;
@@ -20,26 +21,18 @@ const FOUR_ROLES: {
 }[] = [
   {
     role: "USER",
-    name: "Độc Giả",
+    name: "Độc Giả (Người dùng)",
     badge: "Thành viên",
     badgeClass: "bg-blue-50 text-blue-700 border border-blue-200",
     desc: "Quyền đọc truyện miễn phí & VIP, nạp xu mua chương, lưu tủ sách và thảo luận trên diễn đàn.",
     icon: "menu_book",
   },
   {
-    role: "AUTHOR",
-    name: "Tác Giả",
-    badge: "Sáng tác & Tác quyền",
-    badgeClass: "bg-amber-50 text-amber-800 border border-amber-200",
-    desc: "Có studio sáng tác, đăng tải tác phẩm mới, xuất bản chương truyện và yêu cầu rút nhuận bút.",
-    icon: "edit_note",
-  },
-  {
     role: "MANAGER",
-    name: "Manager (Kiểm duyệt viên)",
-    badge: "Điều hành",
-    badgeClass: "bg-slate-100 text-slate-800 border border-slate-300",
-    desc: "Quyền duyệt truyện mới, kiểm tra bản quyền, xử lý báo cáo diễn đàn và điều hành cộng đồng.",
+    name: "Manager (Quản lý nội dung)",
+    badge: "Ban biên tập",
+    badgeClass: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+    desc: "Quyền quản lý tác phẩm (CRUD Story), quản lý danh mục thể loại và hệ thống nhãn thẻ tag.",
     icon: "gavel",
   },
   {
@@ -47,7 +40,7 @@ const FOUR_ROLES: {
     name: "Admin (Quản trị viên)",
     badge: "ROOT",
     badgeClass: "bg-slate-900 text-white",
-    desc: "Toàn quyền quản trị hệ sinh thái: phân quyền người dùng, cấu hình tỷ giá và quản lý tài chính.",
+    desc: "Toàn quyền quản trị hệ thống: phân quyền tài khoản, cấu hình nền tảng và kiểm duyệt vi phạm.",
     icon: "admin_panel_settings",
   },
 ];
@@ -58,8 +51,8 @@ export default function ChangeRoleModal({
   onClose,
   onConfirm,
 }: ChangeRoleModalProps) {
-  const [selectedRole, setSelectedRole] = useState<"USER" | "AUTHOR" | "ADMIN" | "MANAGER">(
-    user?.role || "USER"
+  const [selectedRole, setSelectedRole] = useState<"USER" | "ADMIN" | "MANAGER">(
+    user?.role === "ADMIN" ? "ADMIN" : user?.role === "MANAGER" ? "MANAGER" : "USER"
   );
 
   if (!isOpen || !user) return null;
@@ -70,8 +63,8 @@ export default function ChangeRoleModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 flex flex-col gap-4">
+    <ModalPortal isOpen={isOpen} onClose={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 flex flex-col gap-4 animate-modalPop relative z-10">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
@@ -94,12 +87,23 @@ export default function ChangeRoleModal({
           </button>
         </div>
 
-        {/* 4 Roles list */}
+        {/* Roles list */}
         <div className="flex flex-col gap-2.5">
           <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-            Chọn 1 trong 4 vai trò hệ thống:
+            Chọn vai trò quản trị (Chỉ áp dụng: Độc Giả, Manager, Admin):
           </p>
-          {FOUR_ROLES.map((item) => {
+
+          {/* Info note about Author */}
+          <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+            <span className="material-symbols-outlined text-[18px] text-amber-600 shrink-0 mt-0.5">
+              info
+            </span>
+            <p className="leading-relaxed">
+              <strong>Lưu ý:</strong> Vai trò <strong>Tác Giả (Author)</strong> do người dùng tự chủ động đăng ký và nâng cấp qua studio sáng tác. Admin chỉ cấp quyền quản trị nội dung (Manager), quyền quản trị viên (Admin) hoặc đưa về tài khoản Độc Giả.
+            </p>
+          </div>
+
+          {ADMIN_ASSIGNABLE_ROLES.map((item) => {
             const isSelected = selectedRole === item.role;
             return (
               <div
@@ -159,6 +163,6 @@ export default function ChangeRoleModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

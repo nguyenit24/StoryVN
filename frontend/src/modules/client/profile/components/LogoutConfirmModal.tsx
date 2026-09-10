@@ -7,6 +7,7 @@ import { clearAuth } from "@/common/utils/token";
 import { Button } from "@/common/components/Button";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface LogoutConfirmModalProps {
   isOpen: boolean;
@@ -189,13 +190,13 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+    <ModalPortal isOpen={isOpen} onClose={onClose}>
       <LogoutConfirmDialog
         key={defaultMode}
         defaultMode={defaultMode}
         onClose={onClose}
         onSuccess={onSuccess}
       />
-    </div>
+    </ModalPortal>
   );
 };

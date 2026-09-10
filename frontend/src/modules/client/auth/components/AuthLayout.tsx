@@ -34,9 +34,11 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       <header className="relative z-10 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-md px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-8 h-8 bg-zinc-950 flex items-center justify-center text-white font-mono font-bold text-sm tracking-wider border border-zinc-950 transition-transform group-hover:scale-95">
-              S
-            </div>
+            <img
+              src="/logo.png"
+              alt="StoryVN Logo"
+              className="w-8 h-8 object-contain shrink-0 transition-transform group-hover:scale-105"
+            />
             <div className="flex flex-col">
               <span className="font-bold text-base tracking-widest text-zinc-950 uppercase font-mono">
                 STORYVN
