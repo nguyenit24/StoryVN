@@ -8,6 +8,7 @@ import { Button } from "@/common/components/Button";
 import { Input } from "@/common/components/Input";
 import { Alert } from "@/common/components/Alert";
 import { getFullImageUrl } from "@/common/utils/imageUrl";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -352,8 +353,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   if (!isOpen || !user) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+    <ModalPortal isOpen={isOpen} onClose={onClose}>
       <EditProfileForm user={user} onClose={onClose} onSuccess={onSuccess} />
-    </div>
+    </ModalPortal>
   );
 };

@@ -29,10 +29,19 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // 2. Đã đăng nhập nhưng không có vai trò ADMIN hoặc MANAGER (chỉ là Độc Giả / Tác Giả)
-    const isAuthorized = hasRole("ADMIN", "MANAGER");
+    // 2. Nếu là vai trò MANAGER -> Điều hướng về Manager Portal riêng
+    if (hasRole("MANAGER") && !hasRole("ADMIN")) {
+      toast.success("Chào mừng Quản lý nội dung! Đang chuyển hướng về Manager Portal...", {
+        id: "admin-guard-manager-redirect",
+      });
+      router.replace("/manager");
+      return;
+    }
+
+    // 3. Đã đăng nhập nhưng không có vai trò ADMIN
+    const isAuthorized = hasRole("ADMIN");
     if (!isAuthorized) {
-      toast.error("Tài khoản của bạn không có quyền truy cập phân hệ Quản trị!", {
+      toast.error("Tài khoản của bạn không có quyền truy cập phân hệ Quản trị tối cao (Admin)!", {
         id: "admin-guard-forbidden",
       });
       router.replace("/");
@@ -53,8 +62,8 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     );
   }
 
-  // Chặn tuyệt đối không hiển thị bất kỳ giao diện admin nào nếu chưa đăng nhập hoặc không đủ quyền
-  if (!isAuthenticated || !hasRole("ADMIN", "MANAGER")) {
+  // Chặn tuyệt đối không hiển thị bất kỳ giao diện admin nào nếu chưa đăng nhập hoặc không đủ quyền ADMIN
+  if (!isAuthenticated || !hasRole("ADMIN")) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3 text-center px-4 max-w-sm">
@@ -62,10 +71,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             <span className="material-symbols-outlined text-[26px]">lock</span>
           </div>
           <h2 className="text-sm font-bold text-slate-800">
-            Yêu cầu quyền Quản trị viên
+            Yêu cầu quyền Quản trị viên (Admin)
           </h2>
           <p className="text-xs text-slate-500">
-            Khu vực này chỉ dành riêng cho Admin và Manager. Đang chuyển hướng...
+            Khu vực này chỉ dành riêng cho Quản trị viên tối cao. Đang chuyển hướng...
           </p>
         </div>
       </div>

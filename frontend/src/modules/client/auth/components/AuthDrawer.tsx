@@ -463,9 +463,11 @@ export const AuthDrawer: React.FC<AuthDrawerProps> = ({
           {/* Top Brand Header (Clean, no Tac quyen badge) */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/30">
-                S
-              </div>
+              <img
+                src="/logo.png"
+                alt="StoryVN Logo"
+                className="w-10 h-10 object-contain drop-shadow-md"
+              />
               <div>
                 <span className="text-xl font-bold tracking-tight text-white">StoryVN</span>
                 <p className="text-xs text-slate-300 font-normal">Nền tảng văn học số độc quyền</p>

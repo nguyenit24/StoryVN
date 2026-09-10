@@ -2,6 +2,7 @@
 
 import React from "react";
 import { SystemUserItem } from "../models/user.model";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface UserDetailModalProps {
   user: SystemUserItem | null;
@@ -39,8 +40,8 @@ export default function UserDetailModal({
   const roleInfo = getRoleBadgeDisplay();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 flex flex-col gap-4">
+    <ModalPortal isOpen={isOpen} onClose={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 flex flex-col gap-4 animate-modalPop relative z-10">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
@@ -193,6 +194,6 @@ export default function UserDetailModal({
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

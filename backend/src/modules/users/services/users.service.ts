@@ -14,7 +14,10 @@ import {
 } from '../../authors/schemas/author-profile.schema.js';
 import { UpdateProfileDto } from '../dto/update-profile.dto.js';
 import { ChangePasswordDto } from '../dto/change-password.dto.js';
+import { AdminUpdateUserDto } from '../dto/admin-update-user.dto.js';
 import { escapeRegex } from '../../../common/utils/regex.utils.js';
+import { RolesService } from '../../roles/services/roles.service.js';
+import { RoleType } from '../../roles/schemas/role.schema.js';
 
 @Injectable()
 export class UsersService {
@@ -23,6 +26,7 @@ export class UsersService {
     private readonly userModel: Model<UserDocument>,
     @InjectModel(AuthorProfile.name)
     private readonly authorProfileModel: Model<AuthorProfileDocument>,
+    private readonly rolesService: RolesService,
   ) {}
 
   async findAll(page = 1, limit = 20) {
@@ -250,6 +254,200 @@ export class UsersService {
       success: true,
       message: 'Đổi mật khẩu thành công. Các phiên đăng nhập khác đã được thu hồi.',
       data: null,
+    };
+  }
+
+  async updateRole(adminUserId: string, targetUserId: string, roleName: RoleType) {
+    if (!Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestException('ID người dùng không hợp lệ');
+    }
+
+    if (adminUserId && targetUserId === adminUserId) {
+      throw new BadRequestException('Không thể tự thay đổi vai trò của chính mình');
+    }
+
+    if (roleName === RoleType.AUTHOR) {
+      throw new BadRequestException(
+        'Không được phép gán vai trò Tác giả (AUTHOR). Người dùng tự nâng cấp lên tác giả qua quy trình đăng ký riêng.',
+      );
+    }
+
+    const allowedRoles = [RoleType.USER, RoleType.MANAGER, RoleType.ADMIN];
+    if (!allowedRoles.includes(roleName)) {
+      throw new BadRequestException(
+        'Vai trò không hợp lệ. Admin chỉ được chuyển đổi giữa: USER, MANAGER, ADMIN.',
+      );
+    }
+
+    const user = await this.userModel.findById(targetUserId).exec();
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    const roleDoc = await this.rolesService.findByName(roleName);
+    if (!roleDoc) {
+      throw new NotFoundException(`Không tìm thấy vai trò ${roleName} trong hệ thống`);
+    }
+
+    user.roleId = roleDoc._id;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await user.save();
+
+    const updatedUser = await this.userModel
+      .findById(targetUserId)
+      .select('-password')
+      .populate('roleId', 'name description isActive')
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      message: `Đã cập nhật vai trò người dùng thành ${roleName}`,
+      data: { user: updatedUser },
+    };
+  }
+
+  async updateStatus(adminUserId: string, targetUserId: string, isActive: boolean) {
+    if (!Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestException('ID người dùng không hợp lệ');
+    }
+
+    if (adminUserId && targetUserId === adminUserId && !isActive) {
+      throw new BadRequestException('Không thể tự khóa tài khoản quản trị của chính mình');
+    }
+
+    const user = await this.userModel.findById(targetUserId).exec();
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    user.isActive = isActive;
+    if (!isActive) {
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    }
+    await user.save();
+
+    const updatedUser = await this.userModel
+      .findById(targetUserId)
+      .select('-password')
+      .populate('roleId', 'name description isActive')
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      message: isActive ? 'Đã kích hoạt tài khoản' : 'Đã khóa tài khoản thành công',
+      data: { user: updatedUser },
+    };
+  }
+
+  async adminUpdateUser(adminUserId: string, targetUserId: string, dto: AdminUpdateUserDto) {
+    if (!Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestException('ID người dùng không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(targetUserId).exec();
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    if (dto.role) {
+      if (adminUserId && targetUserId === adminUserId) {
+        throw new BadRequestException('Không thể tự thay đổi vai trò của chính mình');
+      }
+
+      if (dto.role === RoleType.AUTHOR) {
+        throw new BadRequestException(
+          'Không được phép gán vai trò Tác giả (AUTHOR). Người dùng tự nâng cấp lên tác giả qua quy trình đăng ký riêng.',
+        );
+      }
+
+      const allowedRoles = [RoleType.USER, RoleType.MANAGER, RoleType.ADMIN];
+      if (!allowedRoles.includes(dto.role)) {
+        throw new BadRequestException(
+          'Vai trò không hợp lệ. Admin chỉ được chuyển đổi giữa: USER, MANAGER, ADMIN.',
+        );
+      }
+
+      const roleDoc = await this.rolesService.findByName(dto.role);
+      if (!roleDoc) {
+        throw new NotFoundException(`Không tìm thấy vai trò ${dto.role} trong hệ thống`);
+      }
+      user.roleId = roleDoc._id;
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    }
+
+    if (dto.isActive !== undefined) {
+      if (adminUserId && targetUserId === adminUserId && !dto.isActive) {
+        throw new BadRequestException('Không thể tự khóa tài khoản quản trị của chính mình');
+      }
+      user.isActive = dto.isActive;
+      if (!dto.isActive) {
+        user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+      }
+    }
+
+    if (dto.displayName !== undefined) {
+      user.displayName = dto.displayName.trim();
+    }
+    if (dto.bio !== undefined) {
+      user.bio = dto.bio.trim();
+    }
+
+    await user.save();
+
+    const updatedUser = await this.userModel
+      .findById(targetUserId)
+      .select('-password')
+      .populate('roleId', 'name description isActive')
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      message: 'Cập nhật tài khoản người dùng thành công',
+      data: { user: updatedUser },
+    };
+  }
+
+  async getOverviewStats() {
+    const [totalUsers, activeUsers, lockedUsers] = await Promise.all([
+      this.userModel.countDocuments().exec(),
+      this.userModel.countDocuments({ isActive: true }).exec(),
+      this.userModel.countDocuments({ isActive: false }).exec(),
+    ]);
+
+    return {
+      success: true,
+      message: 'Lấy dữ liệu thống kê tổng quan người dùng thành công',
+      data: {
+        totalUsers,
+        activeUsers,
+        lockedUsers,
+      },
+    };
+  }
+
+  async findById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('ID người dùng không hợp lệ');
+    }
+
+    const user = await this.userModel
+      .findById(id)
+      .select('-password')
+      .populate('roleId', 'name description isActive')
+      .lean()
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    return {
+      success: true,
+      message: 'Lấy thông tin người dùng thành công',
+      data: { user },
     };
   }
 }

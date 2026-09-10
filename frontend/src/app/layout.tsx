@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   title: "StoryVN - Nền Tảng Văn Học Số Độc Quyền Hàng Đầu Việt Nam",
   description:
     "Đọc truyện chữ, tiểu thuyết, truyện dịch và sáng tác độc quyền với hệ sinh thái bản quyền 4.0.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

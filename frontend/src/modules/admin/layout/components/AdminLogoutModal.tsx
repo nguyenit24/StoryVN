@@ -4,6 +4,7 @@ import React from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface AdminLogoutModalProps {
   isOpen: boolean;
@@ -28,8 +29,8 @@ export default function AdminLogoutModal({ isOpen, onClose }: AdminLogoutModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 flex flex-col gap-4">
+    <ModalPortal isOpen={isOpen} onClose={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 flex flex-col gap-4 animate-modalPop relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
             <span className="material-symbols-outlined text-[22px]">logout</span>
@@ -63,6 +64,6 @@ export default function AdminLogoutModal({ isOpen, onClose }: AdminLogoutModalPr
           </button>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

@@ -5,6 +5,7 @@ import { ProfileService } from "../services/profile.service";
 import { Button } from "@/common/components/Button";
 import { Input } from "@/common/components/Input";
 import { Alert } from "@/common/components/Alert";
+import ModalPortal from "@/common/components/ModalPortal";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -87,9 +88,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+    <ModalPortal isOpen={isOpen} onClose={isSubmitting ? undefined : onClose}>
       <div
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col"
+        className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col animate-modalPop relative z-10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -203,6 +204,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </ModalPortal>
   );
 };

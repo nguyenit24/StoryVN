@@ -5,6 +5,7 @@ import { AuthorProfile, AuthorProfileSchema } from '../authors/schemas/author-pr
 import { UsersService } from './services/users.service.js';
 import { UsersController } from './controllers/users.controller.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { RolesModule } from '../roles/roles.module.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
       { name: AuthorProfile.name, schema: AuthorProfileSchema },
     ]),
     forwardRef(() => AuthModule),
+    RolesModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, RolesGuard],
