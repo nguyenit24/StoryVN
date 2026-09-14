@@ -37,7 +37,7 @@ export default function ProfilePage() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isUpgradeAuthorOpen, setIsUpgradeAuthorOpen] = useState(false);
-  const [logoutModalMode, setLogoutModalMode] = useState<"current" | "all">("current");
+  const [logoutModalMode] = useState<"current" | "all">("current");
 
   const currentRole = (
     typeof user?.roleId === "object" && user?.roleId?.name
@@ -144,31 +144,38 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* ==================== 2. COVER BANNER ==================== */}
-      <div className="relative w-full h-56 sm:h-72 bg-slate-900 overflow-hidden">
-        <img
-          src={
-            user?.authorProfile?.coverImage ||
-            "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1800&q=80"
-          }
-          alt="Cover Banner"
-          className="w-full h-full object-cover opacity-80"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/30 to-transparent" />
+      {/* ==================== 2. COVER BANNER (CHỈ DÀNH CHO TÁC GIẢ) ==================== */}
+      {isAuthor && (
+        <div className="relative w-full h-56 sm:h-72 bg-slate-900 overflow-hidden">
+          <img
+            src={
+              user?.authorProfile?.coverImage
+                ? getFullImageUrl(user.authorProfile.coverImage)
+                : "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1800&q=80"
+            }
+            alt="Cover Banner"
+            className="w-full h-full object-cover opacity-80"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/30 to-transparent" />
 
-        {/* Action button: Chỉnh sửa ảnh bìa */}
-        <button
-          type="button"
-          onClick={() => setIsEditProfileOpen(true)}
-          className="absolute top-4 right-4 sm:top-6 sm:right-8 bg-black/50 hover:bg-black/70 backdrop-blur-md text-white text-xs font-bold px-3.5 py-2 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg transition-all cursor-pointer"
-        >
-          <span>📷</span>
-          <span>Đổi ảnh bìa</span>
-        </button>
-      </div>
+          {/* Action button: Chỉnh sửa ảnh bìa dành riêng cho Tác giả */}
+          <button
+            type="button"
+            onClick={() => setIsEditProfileOpen(true)}
+            className="absolute top-4 right-4 sm:top-6 sm:right-8 bg-black/50 hover:bg-black/70 backdrop-blur-md text-white text-xs font-bold px-3.5 py-2 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg transition-all cursor-pointer"
+          >
+            <span>📷</span>
+            <span>Đổi ảnh bìa</span>
+          </button>
+        </div>
+      )}
 
       {/* ==================== 3. PROFILE HEADER CARD ==================== */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 -mt-20 sm:-mt-24 relative z-10 w-full">
+      <div
+        className={`max-w-7xl mx-auto px-4 sm:px-8 relative z-10 w-full ${
+          isAuthor ? "-mt-20 sm:-mt-24" : "pt-8"
+        }`}
+      >
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             {/* Avatar & User Info */}

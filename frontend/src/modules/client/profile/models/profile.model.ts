@@ -7,6 +7,14 @@ export interface UpgradeAuthorDto {
   authorSince?: string;
 }
 
+export interface UpdateAuthorProfileDto {
+  penName?: string;
+  writingStyle?: string;
+  coverImage?: string;
+  authorSince?: string;
+}
+
+
 export interface UpgradeAuthorResponseData {
   profile: AuthorProfileInfo;
   tokens: {

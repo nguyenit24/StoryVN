@@ -6,18 +6,14 @@ import ManagerHeader from "./ManagerHeader";
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  useEffect(() => {
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
-      const saved = localStorage.getItem("manager_sidebar_collapsed");
-      if (saved === "true") {
-        setIsCollapsed(true);
-      }
+      return localStorage.getItem("manager_sidebar_collapsed") === "true";
     } catch {
-      // Ignore
+      return false;
     }
-  }, []);
+  });
 
   const handleToggleCollapse = () => {
     setIsCollapsed((prev) => {
