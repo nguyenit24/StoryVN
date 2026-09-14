@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { User, UpdateProfileDto } from "@/types/auth";
 import { ProfileService } from "../services/profile.service";
+import { AuthorService } from "../services/author.service";
 import { setStoredUser } from "@/common/utils/token";
 import { Button } from "@/common/components/Button";
 import { Input } from "@/common/components/Input";
@@ -28,26 +29,30 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const currentRole = (
+    typeof user?.roleId === "object" && user?.roleId?.name
+      ? user.roleId.name
+      : user?.role || "USER"
+  ).toUpperCase();
+  const isAuthor = currentRole === "AUTHOR";
+
   const [displayName, setDisplayName] = useState(user.displayName || user.username || "");
   const [avatar, setAvatar] = useState(user.avatar || user.avatarUrl || "");
+  const [coverImage, setCoverImage] = useState(user.authorProfile?.coverImage || "");
   const [bio, setBio] = useState(user.bio || "");
   const [facebook, setFacebook] = useState(user.socialLinks?.facebook || "");
   const [twitter, setTwitter] = useState(user.socialLinks?.twitter || "");
 
-  useEffect(() => {
-    setDisplayName(user.displayName || user.username || "");
-    setAvatar(user.avatar || user.avatarUrl || "");
-    setBio(user.bio || "");
-    setFacebook(user.socialLinks?.facebook || "");
-    setTwitter(user.socialLinks?.twitter || "");
-  }, [user]);
+
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle avatar upload via file picker
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +72,7 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
       const res = await ProfileService.uploadAvatar(file);
       if (res.success && res.data?.url) {
         setAvatar(res.data.url);
-        setSuccessMsg("Tải ảnh lên thành công! Nhấn 'Lưu thay đổi' để hoàn tất.");
+        setSuccessMsg("Tải ảnh đại diện lên thành công! Nhấn 'Lưu thay đổi' để hoàn tất.");
       } else {
         setError(res.message || "Không thể tải ảnh lên máy chủ.");
       }
@@ -81,6 +86,41 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
       setIsUploadingAvatar(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Handle cover image upload via file picker for author
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Ảnh bìa quá lớn. Vui lòng chọn ảnh dung lượng dưới 10MB.");
+      return;
+    }
+
+    setIsUploadingCover(true);
+    setError(null);
+
+    try {
+      const res = await AuthorService.uploadCoverImage(file);
+      if (res.success && res.data?.url) {
+        setCoverImage(res.data.url);
+        setSuccessMsg("Tải ảnh bìa tác giả lên thành công! Nhấn 'Lưu thay đổi' để hoàn tất.");
+      } else {
+        setError(res.message || "Không thể tải ảnh bìa lên máy chủ.");
+      }
+    } catch (err: unknown) {
+      const errMsg =
+        err instanceof Error && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : "Lỗi khi tải ảnh bìa lên máy chủ. Vui lòng thử lại.";
+      setError(errMsg || "Lỗi khi tải ảnh bìa lên máy chủ.");
+    } finally {
+      setIsUploadingCover(false);
+      if (coverFileInputRef.current) {
+        coverFileInputRef.current.value = "";
       }
     }
   };
@@ -104,7 +144,29 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
     try {
       const res = await ProfileService.updateProfile(dto);
       if (res.success && res.data?.user) {
-        const updated = res.data.user;
+        let updated = res.data.user;
+
+        // Nếu là tác giả và có thay đổi ảnh bìa, cập nhật vào authorProfile qua API tác giả
+        if (isAuthor) {
+          try {
+            const authorRes = await AuthorService.updateMyAuthorProfile({
+              coverImage: coverImage.trim(),
+            });
+            if (authorRes.success && authorRes.data?.profile) {
+              updated = {
+                ...updated,
+                authorProfile: {
+                  ...(updated.authorProfile || user.authorProfile),
+                  ...authorRes.data.profile,
+                  coverImage: coverImage.trim(),
+                },
+              };
+            }
+          } catch (authorErr) {
+            console.warn("Lỗi khi cập nhật ảnh bìa tác giả:", authorErr);
+          }
+        }
+
         setStoredUser(updated);
         setSuccessMsg("Cập nhật hồ sơ thành công!");
         setTimeout(() => {
@@ -237,7 +299,7 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
         {/* CUSTOM AVATAR URL INPUT */}
         <div>
           <label className="text-xs font-semibold text-slate-700 block mb-1">
-            Hoặc nhập liên kết ảnh trực tiếp (URL)
+            Hoặc nhập liên kết ảnh đại diện (URL)
           </label>
           <Input
             type="url"
@@ -248,10 +310,93 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
           />
         </div>
 
+        {/* AUTHOR COVER BANNER UPLOAD & PREVIEW (CHỈ HIỂN THỊ KHI LÀ TÁC GIẢ) */}
+        {isAuthor && (
+          <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200/70 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <span>🖼️</span>
+                <span>Ảnh bìa tác giả (Cover Banner)</span>
+              </span>
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                Dành cho Tác giả
+              </span>
+            </div>
+
+            {/* Preview Banner */}
+            <div className="relative w-full h-28 rounded-xl overflow-hidden bg-slate-800 border border-amber-200">
+              {coverImage ? (
+                <img
+                  src={getFullImageUrl(coverImage)}
+                  alt="Author Cover Preview"
+                  className="w-full h-full object-cover"
+                  onError={() => setCoverImage("")}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs">
+                  <span>Chưa có ảnh bìa tùy chỉnh</span>
+                  <span className="text-[10px] text-slate-500">Hiển thị ảnh nền mặc định</span>
+                </div>
+              )}
+
+              {isUploadingCover && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-bold">
+                  Đang tải ảnh bìa...
+                </div>
+              )}
+            </div>
+
+            {/* Actions for Cover */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <input
+                type="file"
+                ref={coverFileInputRef}
+                onChange={handleCoverFileChange}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                id="cover-upload-input"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                isLoading={isUploadingCover}
+                onClick={() => coverFileInputRef.current?.click()}
+                className="border-amber-300 text-amber-800 hover:bg-amber-100/50"
+              >
+                📁 Tải ảnh bìa từ máy
+              </Button>
+              {coverImage && (
+                <button
+                  type="button"
+                  onClick={() => setCoverImage("")}
+                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1 font-medium transition-colors"
+                >
+                  Xóa ảnh bìa
+                </button>
+              )}
+            </div>
+
+            {/* Direct URL input for Cover */}
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Hoặc dán liên kết ảnh bìa trực tiếp (URL)
+              </label>
+              <Input
+                type="url"
+                placeholder="https://example.com/banner.jpg"
+                value={coverImage}
+                onChange={(e) => setCoverImage(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+          </div>
+        )}
+
         {/* DISPLAY NAME */}
         <div>
           <label className="text-xs font-semibold text-slate-700 block mb-1">
-            Tên hiển thị độc giả <span className="text-red-500">*</span>
+            {isAuthor ? "Tên hiển thị / Bút danh" : "Tên hiển thị độc giả"} <span className="text-red-500">*</span>
           </label>
           <Input
             type="text"
@@ -354,7 +499,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   return (
     <ModalPortal isOpen={isOpen} onClose={onClose}>
-      <EditProfileForm user={user} onClose={onClose} onSuccess={onSuccess} />
+      <EditProfileForm
+        key={user._id || user.id || user.username}
+        user={user}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
     </ModalPortal>
   );
 };

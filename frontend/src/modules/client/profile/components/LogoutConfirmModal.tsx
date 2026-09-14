@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/modules/client/auth/services/auth.service";
-import { clearAuth } from "@/common/utils/token";
 import { Button } from "@/common/components/Button";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
@@ -149,7 +148,7 @@ const LogoutConfirmDialog: React.FC<LogoutConfirmDialogProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Thu hồi toàn bộ token đăng nhập trên tất cả máy tính, điện thoại. Bạn sẽ phải đăng nhập lại từ đầu trên mọi thiết bị. Thích hợp khi bạn vừa dùng máy công cộng hoặc nghi ngờ tài khoản bị lộ.
+                Thu hồi quyền truy cập mội thiết bị đã đăng nhập
               </p>
             </div>
           </div>
