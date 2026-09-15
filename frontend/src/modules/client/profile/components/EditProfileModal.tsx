@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { User, UpdateProfileDto } from "@/types/auth";
 import { ProfileService } from "../services/profile.service";
 import { AuthorService } from "../services/author.service";
@@ -8,8 +8,8 @@ import { setStoredUser } from "@/common/utils/token";
 import { Button } from "@/common/components/Button";
 import { Input } from "@/common/components/Input";
 import { Alert } from "@/common/components/Alert";
-import { getFullImageUrl } from "@/common/utils/imageUrl";
 import ModalPortal from "@/common/components/ModalPortal";
+import { AvatarUploadSection, CoverUploadSection } from "./AvatarUploadSection";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -24,11 +24,7 @@ interface EditProfileFormProps {
   onSuccess: (updatedUser: User) => void;
 }
 
-const EditProfileForm: React.FC<EditProfileFormProps> = ({
-  user,
-  onClose,
-  onSuccess,
-}) => {
+const EditProfileForm: React.FC<EditProfileFormProps> = ({ user, onClose, onSuccess }) => {
   const currentRole = (
     typeof user?.roleId === "object" && user?.roleId?.name
       ? user.roleId.name
@@ -43,31 +39,21 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
   const [facebook, setFacebook] = useState(user.socialLinks?.facebook || "");
   const [twitter, setTwitter] = useState(user.socialLinks?.twitter || "");
 
-
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const coverFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Handle avatar upload via file picker
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       setError("Ảnh quá lớn. Vui lòng chọn ảnh dung lượng dưới 10MB.");
       return;
     }
-
     setIsUploadingAvatar(true);
     setError(null);
-
     try {
       const res = await ProfileService.uploadAvatar(file);
       if (res.success && res.data?.url) {
@@ -84,25 +70,18 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
       setError(errMsg || "Lỗi khi tải ảnh đại diện lên máy chủ.");
     } finally {
       setIsUploadingAvatar(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
-  // Handle cover image upload via file picker for author
   const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 10 * 1024 * 1024) {
       setError("Ảnh bìa quá lớn. Vui lòng chọn ảnh dung lượng dưới 10MB.");
       return;
     }
-
     setIsUploadingCover(true);
     setError(null);
-
     try {
       const res = await AuthorService.uploadCoverImage(file);
       if (res.success && res.data?.url) {
@@ -119,9 +98,6 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
       setError(errMsg || "Lỗi khi tải ảnh bìa lên máy chủ.");
     } finally {
       setIsUploadingCover(false);
-      if (coverFileInputRef.current) {
-        coverFileInputRef.current.value = "";
-      }
     }
   };
 
@@ -146,7 +122,6 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
       if (res.success && res.data?.user) {
         let updated = res.data.user;
 
-        // Nếu là tác giả và có thay đổi ảnh bìa, cập nhật vào authorProfile qua API tác giả
         if (isAuthor) {
           try {
             const authorRes = await AuthorService.updateMyAuthorProfile({
@@ -187,15 +162,6 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
     }
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return "U";
-    const parts = name.trim().split(" ");
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
-
   return (
     <div
       className="bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]"
@@ -204,9 +170,7 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
       {/* Header */}
       <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
         <div>
-          <h3 className="text-base sm:text-lg font-black text-slate-800">
-            Chỉnh sửa hồ sơ cá nhân
-          </h3>
+          <h3 className="text-base sm:text-lg font-black text-slate-800">Chỉnh sửa hồ sơ cá nhân</h3>
           <p className="text-xs text-slate-500 mt-0.5">
             Cập nhật tên hiển thị, ảnh đại diện và thông tin giới thiệu của bạn
           </p>
@@ -223,177 +187,32 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
 
       {/* Scrollable Form Body */}
       <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-        {error && (
-          <Alert type="error" message={error} onClose={() => setError(null)} />
-        )}
-        {successMsg && (
-          <Alert
-            type="success"
-            message={successMsg}
-            onClose={() => setSuccessMsg(null)}
-          />
-        )}
+        {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+        {successMsg && <Alert type="success" message={successMsg} onClose={() => setSuccessMsg(null)} />}
 
-        {/* AVATAR UPLOAD & PREVIEW */}
-        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col sm:flex-row items-center gap-5">
-          <div className="relative group shrink-0">
-            {avatar ? (
-              <img
-                src={getFullImageUrl(avatar)}
-                alt="Avatar Preview"
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-white shadow-md"
-                onError={() => setAvatar("")}
-              />
-            ) : (
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-2xl font-black shadow-md border-2 border-white">
-                {getInitials(displayName || user.username)}
-              </div>
-            )}
+        {/* Avatar Upload */}
+        <AvatarUploadSection
+          avatar={avatar}
+          isUploadingAvatar={isUploadingAvatar}
+          displayName={displayName}
+          username={user.username}
+          onFileChange={handleAvatarFileChange}
+          onAvatarUrlChange={setAvatar}
+          onRemoveAvatar={() => setAvatar("")}
+        />
 
-            {isUploadingAvatar && (
-              <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center text-white text-xs font-bold">
-                Đang tải...
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 text-center sm:text-left space-y-2">
-            <span className="text-xs font-bold text-slate-700 block">
-              Ảnh đại diện
-            </span>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Hỗ trợ định dạng JPG, PNG, WEBP tối đa 10MB. Ảnh sẽ được tự động tối ưu hóa.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                id="avatar-upload-input"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                isLoading={isUploadingAvatar}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                📁 Chọn ảnh từ máy
-              </Button>
-              {avatar && (
-                <button
-                  type="button"
-                  onClick={() => setAvatar("")}
-                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1 font-medium transition-colors"
-                >
-                  Xóa ảnh
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* CUSTOM AVATAR URL INPUT */}
-        <div>
-          <label className="text-xs font-semibold text-slate-700 block mb-1">
-            Hoặc nhập liên kết ảnh đại diện (URL)
-          </label>
-          <Input
-            type="url"
-            placeholder="https://example.com/avatar.jpg"
-            value={avatar}
-            onChange={(e) => setAvatar(e.target.value)}
-            className="text-xs"
-          />
-        </div>
-
-        {/* AUTHOR COVER BANNER UPLOAD & PREVIEW (CHỈ HIỂN THỊ KHI LÀ TÁC GIẢ) */}
+        {/* Author Cover Banner */}
         {isAuthor && (
-          <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200/70 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                <span>🖼️</span>
-                <span>Ảnh bìa tác giả (Cover Banner)</span>
-              </span>
-              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                Dành cho Tác giả
-              </span>
-            </div>
-
-            {/* Preview Banner */}
-            <div className="relative w-full h-28 rounded-xl overflow-hidden bg-slate-800 border border-amber-200">
-              {coverImage ? (
-                <img
-                  src={getFullImageUrl(coverImage)}
-                  alt="Author Cover Preview"
-                  className="w-full h-full object-cover"
-                  onError={() => setCoverImage("")}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs">
-                  <span>Chưa có ảnh bìa tùy chỉnh</span>
-                  <span className="text-[10px] text-slate-500">Hiển thị ảnh nền mặc định</span>
-                </div>
-              )}
-
-              {isUploadingCover && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-bold">
-                  Đang tải ảnh bìa...
-                </div>
-              )}
-            </div>
-
-            {/* Actions for Cover */}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <input
-                type="file"
-                ref={coverFileInputRef}
-                onChange={handleCoverFileChange}
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                id="cover-upload-input"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                isLoading={isUploadingCover}
-                onClick={() => coverFileInputRef.current?.click()}
-                className="border-amber-300 text-amber-800 hover:bg-amber-100/50"
-              >
-                📁 Tải ảnh bìa từ máy
-              </Button>
-              {coverImage && (
-                <button
-                  type="button"
-                  onClick={() => setCoverImage("")}
-                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1 font-medium transition-colors"
-                >
-                  Xóa ảnh bìa
-                </button>
-              )}
-            </div>
-
-            {/* Direct URL input for Cover */}
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                Hoặc dán liên kết ảnh bìa trực tiếp (URL)
-              </label>
-              <Input
-                type="url"
-                placeholder="https://example.com/banner.jpg"
-                value={coverImage}
-                onChange={(e) => setCoverImage(e.target.value)}
-                className="text-xs"
-              />
-            </div>
-          </div>
+          <CoverUploadSection
+            coverImage={coverImage}
+            isUploadingCover={isUploadingCover}
+            onFileChange={handleCoverFileChange}
+            onCoverUrlChange={setCoverImage}
+            onRemoveCover={() => setCoverImage("")}
+          />
         )}
 
-        {/* DISPLAY NAME */}
+        {/* Display Name */}
         <div>
           <label className="text-xs font-semibold text-slate-700 block mb-1">
             {isAuthor ? "Tên hiển thị / Bút danh" : "Tên hiển thị độc giả"} <span className="text-red-500">*</span>
@@ -408,15 +227,11 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
           />
         </div>
 
-        {/* BIO */}
+        {/* Bio */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-semibold text-slate-700">
-              Tiểu sử / Giới thiệu cá nhân
-            </label>
-            <span className="text-[11px] text-slate-400">
-              {bio.length}/300 ký tự
-            </span>
+            <label className="text-xs font-semibold text-slate-700">Tiểu sử / Giới thiệu cá nhân</label>
+            <span className="text-[11px] text-slate-400">{bio.length}/300 ký tự</span>
           </div>
           <textarea
             rows={3}
@@ -428,17 +243,12 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
           />
         </div>
 
-        {/* SOCIAL LINKS */}
+        {/* Social Links */}
         <div className="space-y-3 pt-1 border-t border-slate-100">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Liên kết mạng xã hội
-          </h4>
-
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Liên kết mạng xã hội</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                Facebook URL
-              </label>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">Facebook URL</label>
               <Input
                 type="url"
                 placeholder="https://facebook.com/username"
@@ -447,11 +257,8 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
                 className="text-xs"
               />
             </div>
-
             <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                X (Twitter) URL
-              </label>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">X (Twitter) URL</label>
               <Input
                 type="url"
                 placeholder="https://x.com/username"
@@ -463,7 +270,7 @@ const EditProfileForm: React.FC<EditProfileFormProps> = ({
           </div>
         </div>
 
-        {/* Form Actions */}
+        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <Button
             type="button"
